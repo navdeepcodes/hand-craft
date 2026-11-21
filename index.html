@@ -1,0 +1,1470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hand Craft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root { --core: 255,170,60; --panel: rgba(14,13,22,.6); --line: rgba(255,255,255,.09); --text: #eeedf3; --muted: #9c9aae; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #06050b; color: var(--text); font-family: Inter, system-ui, sans-serif; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  video { display: none; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  button { font-family: inherit; }
+  .glass { background: var(--panel); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); border: 1px solid var(--line); }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; top: 16px; left: 16px; right: 16px; z-index: 5; display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: start; pointer-events: none; transition: opacity .3s; }
+  #hud > * { pointer-events: auto; }
+  .left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .brand { font: 700 13px 'Space Grotesk', sans-serif; letter-spacing: .24em; padding: 11px 14px; border-radius: 12px; }
+  .pill { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); padding: 10px 13px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #55546a; transition: background .3s, box-shadow .3s; }
+  .dot.live { background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.18); }
+
+  .seg { position: relative; display: flex; padding: 4px; border-radius: 13px; justify-self: center; }
+  .seg button { position: relative; z-index: 1; font: 600 13px 'Space Grotesk', sans-serif; letter-spacing: .03em; color: var(--muted); background: none; border: 0; padding: 8px 20px; border-radius: 9px; cursor: pointer; transition: color .2s; }
+  .seg button:hover { color: var(--text); }
+  .seg button.on { color: #0b0a10; }
+  .seg .slider { position: absolute; top: 4px; bottom: 4px; left: 4px; border-radius: 9px; background: rgb(var(--core)); transition: left .28s cubic-bezier(.3,.7,.2,1), width .28s, background .3s; }
+
+  .right { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .swatches, .icons { display: flex; gap: 2px; padding: 4px; border-radius: 13px; }
+  .sw { width: 34px; height: 34px; border-radius: 9px; border: 0; background: none; cursor: pointer; display: grid; place-items: center; }
+  .sw:hover { background: rgba(255,255,255,.06); }
+  .sw i { width: 15px; height: 15px; border-radius: 50%; display: block; transition: transform .2s, box-shadow .2s; }
+  .sw.on i { transform: scale(1.12); box-shadow: 0 0 0 2px #0c0b12, 0 0 0 3.5px rgba(255,255,255,.9); }
+  .ic { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 9px; background: none; color: var(--muted); cursor: pointer; position: relative; transition: background .15s, color .15s; }
+  .ic:hover { background: rgba(255,255,255,.07); color: var(--text); }
+  .ic.on { color: rgb(var(--core)); }
+  .ic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .ic[data-tip]:hover::after, .sw[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: calc(100% + 10px); right: 0; white-space: nowrap; font: 500 11px Inter, sans-serif; color: var(--text); background: #14131c; border: 1px solid var(--line); padding: 6px 9px; border-radius: 8px; z-index: 9; }
+  .sw { position: relative; }
+  .meshonly { display: none !important; }
+  body.mesh .ic.meshonly { display: grid !important; }
+
+  /* ---------- gesture dock ---------- */
+  #dock { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 5; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; padding: 6px; border-radius: 18px; width: max-content; max-width: min(1120px, calc(100vw - 32px)); transition: opacity .3s, transform .3s; }
+  #dock.hide { opacity: 0; transform: translate(-50%, 14px); pointer-events: none; }
+  .gi { display: flex; align-items: center; gap: 10px; padding: 8px 13px 8px 10px; border-radius: 12px; white-space: nowrap; position: relative; transition: background .2s; }
+  .gi .em { font-size: 18px; width: 24px; text-align: center; line-height: 1; }
+  .gi b { display: block; font: 600 12px Inter, sans-serif; color: var(--text); }
+  .gi span { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .gi::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: 3px; height: 2px; border-radius: 2px; background: rgb(var(--core)); transform: scaleX(0); transition: transform .25s; }
+  .gi.active { background: rgba(var(--core), .13); }
+  .gi.active::after { transform: scaleX(1); }
+  .gi[data-m=mesh] { display: none; }
+  body.mesh .gi[data-m=aura] { display: none; }
+  body.mesh .gi[data-m=mesh] { display: flex; }
+  canvas { touch-action: none; }
+
+  #coach { position: fixed; left: 16px; top: 50%; transform: translateY(-50%); z-index: 5; width: 260px; padding: 16px 16px 14px; border-radius: 18px; transition: opacity .3s, transform .3s; }
+  #coach.hide { opacity: 0; transform: translate(-14px, -50%); pointer-events: none; }
+  .c-top { display: flex; justify-content: space-between; align-items: center; font: 600 10px Inter, sans-serif; letter-spacing: .14em; color: var(--muted); }
+  #cSkip { background: none; border: 0; color: var(--muted); font: 500 11px Inter, sans-serif; cursor: pointer; padding: 4px 8px; border-radius: 7px; }
+  #cSkip:hover { color: var(--text); background: rgba(255,255,255,.07); }
+  .c-emoji { font-size: 36px; margin: 12px 0 8px; display: inline-block; animation: bob 1.6s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-5px) rotate(-6deg); } }
+  #coach b { display: block; font: 600 17px 'Space Grotesk', sans-serif; margin-bottom: 5px; }
+  #cSub { display: block; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .c-bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); margin: 14px 0 10px; overflow: hidden; }
+  .c-bar i { display: block; height: 100%; width: 0; background: rgb(var(--core)); border-radius: 4px; }
+  .c-dots { display: flex; gap: 6px; }
+  .c-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.18); }
+  .c-dots i.done { background: rgb(var(--core)); } .c-dots i.cur { background: #fff; }
+  #toast { position: fixed; top: 78px; left: 50%; transform: translate(-50%, -8px); opacity: 0; z-index: 6; font: 500 13px Inter, sans-serif; padding: 10px 18px; border-radius: 999px; transition: opacity .25s, transform .25s; pointer-events: none; white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- intro ---------- */
+  #intro { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse 70% 60% at 50% 45%, rgba(var(--core), .12), transparent 70%), #06050b; transition: opacity .5s; }
+  #intro.out { opacity: 0; pointer-events: none; }
+  .card { width: min(660px, 100%); text-align: center; }
+  .eyebrow { font: 600 11px Inter, sans-serif; letter-spacing: .22em; text-transform: uppercase; color: rgb(var(--core)); }
+  #intro h1 { font: 700 clamp(44px, 9vw, 76px)/1 'Space Grotesk', sans-serif; letter-spacing: -.02em; margin: 14px 0 16px; }
+  #intro p { color: var(--muted); line-height: 1.6; font-size: 15px; max-width: 440px; margin: 0 auto; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 28px 0; text-align: left; }
+  .modes div { padding: 14px 16px; border-radius: 14px; }
+  .modes b { display: block; font: 600 14px 'Space Grotesk', sans-serif; margin-bottom: 4px; }
+  .modes span { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  #begin { font: 600 15px Inter, sans-serif; color: #0b0a10; background: rgb(var(--core)); border: 0; padding: 15px 32px; border-radius: 999px; cursor: pointer; transition: transform .15s, opacity .2s; }
+  #begin:hover { transform: translateY(-1px); }
+  #begin:disabled { opacity: .45; cursor: wait; transform: none; }
+  #err { color: #ff9a8a; margin-top: 14px; font-size: 13px; min-height: 1em; }
+  .keys { margin-top: 22px; font-size: 11.5px; color: #6f6d82; }
+  .keys kbd { font: 500 11px Inter, sans-serif; color: var(--muted); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; margin: 0 1px; }
+
+  @media (max-width: 860px) {
+    #hud { grid-template-columns: 1fr; justify-items: start; }
+    .seg { justify-self: start; }
+    .right { justify-content: flex-start; }
+    .gi span { display: none; }
+    #coach { top: auto; bottom: 150px; transform: none; left: 16px; right: 16px; width: auto; }
+    #coach.hide { transform: translateY(12px); }
+    .gi { padding: 7px 10px 7px 8px; gap: 6px; }
+    #toast { top: auto; bottom: 120px; }
+  }
+  @media (max-width: 640px) { .modes { grid-template-columns: 1fr; } }
+  @media (max-width: 480px) { .pill { display: none; } }
+</style>
+</head>
+<body>
+<video id="video" playsinline muted></video>
+<canvas id="c"></canvas>
+
+<header id="hud">
+  <div class="left">
+    <div class="brand glass">HAND CRAFT</div>
+    <div class="pill glass"><span class="dot" id="dot"></span><span id="status">starting…</span></div>
+  </div>
+  <div class="seg glass" id="seg">
+    <span class="slider" id="slider"></span>
+    <button data-mode="aura" class="on">✦ Aura</button>
+    <button data-mode="mesh">◈ Mesh</button>
+  </div>
+  <div class="right">
+    <div class="swatches glass" id="themes"></div>
+    <div class="icons glass">
+      <button class="ic meshonly" id="tShape" data-tip="Mesh shape (G)"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg></button>
+      <button class="ic meshonly" id="tStyle" data-tip="Grid / triangles (T)"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 12h16M12 4v16"/></svg></button>
+      <button class="ic on" id="tVideo" data-tip="Camera feed (V)"><svg viewBox="0 0 24 24"><path d="M3 7h12v10H3zM15 10l6-3v10l-6-3"/></svg></button>
+      <button class="ic" id="tSkel" data-tip="Hand skeleton (S)"><svg viewBox="0 0 24 24"><circle cx="12" cy="18" r="2"/><path d="M12 16V5M12 16l-5-8M12 16l5-8M12 16l7-3"/></svg></button>
+      <button class="ic" id="tClear" data-tip="Clear (C)"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+      <button class="ic" id="tSnap" data-tip="Snapshot (P)"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+      <button class="ic" id="tTutor" data-tip="Tutorial for this mode"><svg viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5"/></svg></button>
+      <button class="ic on" id="tGuide" data-tip="Gesture guide (H)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14M12 17.5v.01"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<div id="toast" class="glass"></div>
+
+<aside id="coach" class="glass hide" aria-live="polite">
+  <div class="c-top"><span id="cMode">TUTORIAL</span><button id="cSkip">Skip</button></div>
+  <div class="c-emoji" id="cEmoji">✋</div>
+  <b id="cTitle"></b>
+  <span id="cSub"></span>
+  <div class="c-bar"><i id="cProg"></i></div>
+  <div class="c-dots" id="cDots"></div>
+</aside>
+
+<nav id="dock" class="glass">
+  <div class="gi" data-m="aura" data-g="open"><div class="em">✋</div><div><b>Open palm</b><span>Sigil shield</span></div></div>
+  <div class="gi" data-m="aura" data-g="pinch"><div class="em">🤏</div><div><b>Pinch</b><span>Draw light</span></div></div>
+  <div class="gi" data-m="aura" data-g="point"><div class="em">☝️</div><div><b>Point</b><span>Fire stream</span></div></div>
+  <div class="gi" data-m="aura" data-g="fist"><div class="em">✊</div><div><b>Fist → open</b><span>Energy burst</span></div></div>
+  <div class="gi" data-m="aura" data-g="portal"><div class="em">🙌</div><div><b>Both palms</b><span>Portal</span></div></div>
+  <div class="gi" data-m="aura" data-g="bolt"><div class="em">⚡</div><div><b>Both point</b><span>Lightning</span></div></div>
+
+  <div class="gi" data-m="mesh" data-g="grab"><div class="em">🤏</div><div><b>Pinch the mesh</b><span>Grab &amp; carry</span></div></div>
+  <div class="gi" data-m="mesh" data-g="drop"><div class="em">✋</div><div><b>Open your fingers</b><span>Drop · fast = throw</span></div></div>
+  <div class="gi" data-m="mesh" data-g="face"><div class="em">🙂</div><div><b>Drop it on your face</b><span>Wear it · pinch to remove</span></div></div>
+  <div class="gi" data-m="mesh" data-g="stretch"><div class="em">↔️</div><div><b>Pinch with both hands</b><span>Stretch &amp; rotate</span></div></div>
+  <div class="gi" data-m="mesh" data-g="shape"><div class="em">⭐</div><div><b>G or ⭐ button</b><span>Change shape</span></div></div>
+</nav>
+
+<div id="intro">
+  <div class="card">
+    <div class="eyebrow">Hand-tracked visual playground</div>
+    <h1>Hand Craft</h1>
+    <p>Cast light and weave a living mesh with nothing but your hands. Tracking runs entirely in your browser — your camera never leaves this device.</p>
+    <div class="modes">
+      <div class="glass"><b>✦ Aura</b><span>Sigil shields, portals, fire, lightning and light drawing.</span></div>
+      <div class="glass"><b>◈ Mesh</b><span>An elastic net shaped by your fingers — stretch it, throw it, wear it.</span></div>
+    </div>
+    <button id="begin" disabled>Loading hand model…</button>
+    <div id="err"></div>
+    <div class="keys"><kbd>M</kbd> mode · <kbd>G</kbd> mesh shape · <kbd>1</kbd>–<kbd>4</kbd> palette · <kbd>V</kbd> camera · <kbd>H</kbd> guide · <kbd>L</kbd> labels · <kbd>P</kbd> snapshot</div>
+  </div>
+</div>
+
+<script type="module">
+import { HandLandmarker, FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+const TAU = Math.PI * 2;
+const $ = id => document.getElementById(id);
+const video = $('video'), cv = $('c'), ctx = cv.getContext('2d');
+const ink = document.createElement('canvas'), ictx = ink.getContext('2d');
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const lerp = (a, b, k) => a + (b - a) * k;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+const THEMES = [
+  { name: 'Ember',   core: '255,170,60',  hot: '255,240,200', mesh: [40, -25] },
+  { name: 'Arcane',  core: '80,200,255',  hot: '225,250,255', mesh: [185, 268] },
+  { name: 'Void',    core: '185,100,255', hot: '240,220,255', mesh: [255, 330] },
+  { name: 'Emerald', core: '70,255,150',  hot: '220,255,230', mesh: [170, 95] },
+];
+const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+const S = { theme: 0, showVideo: true, showSkel: false, mode: 'aura', guide: true, meshShape: 'blob', tags: true };
+const T = () => THEMES[S.theme];
+
+// =====================================================================
+// UI
+// =====================================================================
+const themesEl = $('themes');
+THEMES.forEach((t, i) => {
+  const b = document.createElement('button');
+  b.className = 'sw'; b.dataset.tip = `${t.name} (${i + 1})`;
+  b.innerHTML = '<i></i>';
+  b.onclick = () => setTheme(i);
+  themesEl.appendChild(b);
+});
+function paintSwatches() {
+  [...themesEl.children].forEach((b, i) => {
+    const t = THEMES[i], [h1, h2] = t.mesh;
+    b.firstChild.style.background = S.mode === 'mesh'
+      ? `linear-gradient(135deg, hsl(${h1},95%,62%), hsl(${h2},95%,62%))`
+      : `rgb(${t.core})`;
+    b.classList.toggle('on', i === S.theme);
+  });
+}
+function setTheme(i) {
+  S.theme = i;
+  document.documentElement.style.setProperty('--core', T().core);
+  paintSwatches();
+}
+
+const seg = $('seg'), slider = $('slider');
+function placeSlider() {
+  const b = seg.querySelector('button.on');
+  slider.style.left = b.offsetLeft + 'px';
+  slider.style.width = b.offsetWidth + 'px';
+}
+seg.querySelectorAll('button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+function setMode(m) {
+  if (S.mode === m) return;
+  S.mode = m;
+  seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  document.body.classList.toggle('mesh', m === 'mesh');
+  placeSlider(); paintSwatches();
+  cloth = null; faceRes = null; faceSm = null;
+  CO.prog = 0; coachRender();
+  toast(m === 'mesh' ? '◈ Mesh — pinch it to grab it' : '✦ Aura');
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+const toggle = (id, key) => { S[key] = !S[key]; $(id).classList.toggle('on', S[key]); };
+$('tVideo').onclick = () => toggle('tVideo', 'showVideo');
+$('tSkel').onclick = () => toggle('tSkel', 'showSkel');
+$('tGuide').onclick = () => { toggle('tGuide', 'guide'); $('dock').classList.toggle('hide', !S.guide); };
+$('tShape').onclick = () => setMeshShape(SHAPES[(SHAPES.indexOf(S.meshShape) + 1) % SHAPES.length]);
+$('tStyle').onclick = () => { meshStyle = 1 - meshStyle; toast(meshStyle ? 'Triangle mesh' : 'Grid mesh'); };
+$('tClear').onclick = clearAll;
+$('tTutor').onclick = () => coachRestart();
+$('cSkip').onclick = () => { CO.step[S.mode] = COACH[S.mode].length; coachSave(); coachRender(); };
+
+// ---------- coach: a step-by-step tutorial that advances when you actually do the gesture ----------
+const COACH = {
+  aura: [
+    { e: '✋', t: 'Raise one hand', s: 'Hold it up in front of the camera, about an arm’s length away.', ok: c => c.n > 0, hold: 15 },
+    { e: '🖐️', t: 'Open your palm', s: 'Spread your fingers wide — a sigil draws itself. Tilt or twist your hand to move it.', ok: c => c.a.open, hold: 35 },
+    { e: '🤏', t: 'Pinch and move', s: 'Touch thumb and index together, then move your hand to paint with light.', ok: c => c.a.pinch, hold: 35 },
+    { e: '✊', t: 'Fist, then open', s: 'Hold a fist until the ring fills, then open your hand to blast it.', ok: c => c.ev.has('burst'), hold: 1 },
+    { e: '🙌', t: 'Both palms up', s: 'Open both hands side by side to tear open a portal.', ok: c => c.a.portal, hold: 25 },
+  ],
+  mesh: [
+    { e: '🤏', t: 'Grab the mesh', s: 'Pinch your thumb and index finger together anywhere on the mesh.', ok: c => c.ev.has('grab'), hold: 1 },
+    { e: '↔️', t: 'Carry it', s: 'Keep pinching and move your hand — the mesh comes with you.', ok: c => c.a.grab, hold: 40 },
+    { e: '✋', t: 'Drop it', s: 'Open your fingers to let go. Let go while moving fast to throw it.', ok: c => c.ev.has('drop'), hold: 1 },
+    { e: '🙂', t: 'Wear it', s: 'Grab it, bring it over your face, and open your fingers.', ok: c => c.ev.has('applied'), hold: 1 },
+    { e: '🤏', t: 'Take it off', s: 'Pinch the mask and pull it away.', ok: c => c.ev.has('peel'), hold: 1 },
+    { e: '🤏', t: 'Stretch it', s: 'Pinch it with both hands and pull them apart.', ok: c => c.a.stretch, hold: 25 },
+  ],
+};
+const CO = { step: {}, prog: 0 };
+function coachSave() { try { localStorage.setItem('hc-coach-' + S.mode, CO.step[S.mode] >= COACH[S.mode].length ? 'done' : ''); } catch {} }
+function coachLoad() { for (const m in COACH) { let d = false; try { d = localStorage.getItem('hc-coach-' + m) === 'done'; } catch {} CO.step[m] = d ? COACH[m].length : 0; } }
+function coachRestart() { CO.step[S.mode] = 0; CO.prog = 0; coachSave(); coachRender(); }
+function coachRender() {
+  const list = COACH[S.mode], i = CO.step[S.mode] ?? 0, el = $('coach');
+  $('dock').classList.toggle('hide', !S.guide || (running && i < list.length));
+  if (!running || i >= list.length) { el.classList.add('hide'); return; }
+  el.classList.remove('hide');
+  const st = list[i];
+  $('cMode').textContent = `${S.mode.toUpperCase()} · STEP ${i + 1} OF ${list.length}`;
+  $('cEmoji').textContent = st.e; $('cTitle').textContent = st.t; $('cSub').textContent = st.s;
+  $('cDots').innerHTML = list.map((_, k) => `<i class="${k < i ? 'done' : k === i ? 'cur' : ''}"></i>`).join('');
+  $('cProg').style.width = '0%';
+}
+function coachTick(c) {
+  const list = COACH[S.mode], i = CO.step[S.mode] ?? 0;
+  if (i >= list.length) return;
+  CO.prog = list[i].ok(c) ? CO.prog + 1 : Math.max(0, CO.prog - 2);
+  const k = Math.min(1, CO.prog / list[i].hold);
+  $('cProg').style.width = (k * 100).toFixed(1) + '%';
+  if (k >= 1) {
+    CO.prog = 0; CO.step[S.mode] = i + 1;
+    if (i + 1 >= list.length) { coachSave(); toast('Tutorial complete — you’ve got it ✨'); }
+    else toast('✓ Nice — next step');
+    coachRender();
+  }
+}
+coachLoad();
+$('tSnap').onclick = snapshot;
+function clearAll() {
+  ictx.clearRect(0, 0, ink.width, ink.height);
+  if (cloth) dissolveMesh();
+}
+function snapshot() {
+  const a = document.createElement('a');
+  a.download = `hand-craft-${Date.now()}.png`;
+  a.href = cv.toDataURL('image/png');
+  a.click();
+  toast('Snapshot saved');
+}
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey) return;
+  if (e.key >= '1' && e.key <= '4') setTheme(+e.key - 1);
+  const k = e.key.toLowerCase();
+  if (k === 'm') setMode(S.mode === 'aura' ? 'mesh' : 'aura');
+  if (k === 'v') $('tVideo').click();
+  if (k === 's') $('tSkel').click();
+  if (k === 't') $('tStyle').click();
+  if (k === 'g') $('tShape').click();
+  if (k === 'c') clearAll();
+  if (k === 'p') snapshot();
+  if (k === 'h') $('tGuide').click();
+  if (k === 'l') { S.tags = !S.tags; toast(S.tags ? 'Gesture labels on' : 'Gesture labels off'); }
+});
+const guideEls = [...document.querySelectorAll('.gi')];
+
+function resize() {
+  cv.width = ink.width = innerWidth;
+  cv.height = ink.height = innerHeight;
+  placeSlider();
+}
+addEventListener('resize', resize);
+
+// =====================================================================
+// shared drawing: glow sprites, particles, rings
+// =====================================================================
+const spriteCache = {};
+function sprite(rgb) {
+  if (spriteCache[rgb]) return spriteCache[rgb];
+  const s = document.createElement('canvas'); s.width = s.height = 64;
+  const g = s.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, `rgba(${rgb},1)`);
+  gr.addColorStop(0.25, `rgba(${rgb},.55)`);
+  gr.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return (spriteCache[rgb] = s);
+}
+
+const P = [], RINGS = [];
+function emit(x, y, vx, vy, life, size, opts = {}) {
+  if (P.length > 3000) P.shift();
+  P.push({ x, y, vx, vy, life, max: life, size, drag: opts.drag ?? 0.96, g: opts.g ?? 0,
+           hot: opts.hot ?? Math.random() < 0.35, theme: S.theme, crisp: opts.crisp, col: opts.col });
+}
+function updateParticles() {
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = P.length - 1; i >= 0; i--) {
+    const p = P[i];
+    p.vx *= p.drag; p.vy = p.vy * p.drag + p.g;
+    p.x += p.vx; p.y += p.vy;
+    if (--p.life <= 0) { P.splice(i, 1); continue; }
+    const k = p.life / p.max;
+    if (p.crisp) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = k; ctx.fillStyle = p.col;
+      const s = p.size * (0.5 + 0.5 * k);
+      ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+      ctx.globalCompositeOperation = 'lighter';
+      continue;
+    }
+    const th = THEMES[p.theme], sz = p.size * (0.4 + k);
+    ctx.globalAlpha = Math.min(1, k * 1.4);
+    ctx.drawImage(sprite(p.hot && k > 0.5 ? th.hot : th.core), p.x - sz, p.y - sz, sz * 2, sz * 2);
+  }
+  for (let i = RINGS.length - 1; i >= 0; i--) {
+    const r = RINGS[i];
+    r.r += r.v; r.v *= 0.95; r.life--;
+    if (r.life <= 0) { RINGS.splice(i, 1); continue; }
+    const k = r.life / r.max;
+    ctx.globalAlpha = k;
+    if (r.crisp) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = r.col; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, TAU); ctx.stroke();
+      ctx.globalCompositeOperation = 'lighter';
+      continue;
+    }
+    ctx.strokeStyle = `rgb(${THEMES[r.theme].hot})`;
+    ctx.shadowColor = `rgb(${THEMES[r.theme].core})`; ctx.shadowBlur = 30;
+    ctx.lineWidth = 2 + 10 * k;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, TAU); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  ctx.globalAlpha = 1;
+}
+
+// =====================================================================
+// AURA MODE
+// =====================================================================
+function circle(c, r) { c.beginPath(); c.arc(0, 0, r, 0, TAU); c.stroke(); }
+function poly(c, n, r, step = 1) {
+  c.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const a = (i * step) / n * TAU - Math.PI / 2;
+    i ? c.lineTo(Math.cos(a) * r, Math.sin(a) * r) : c.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  c.stroke();
+}
+function drawSigil(x, y, r, rot, a, tilt) {
+  const t = T();
+  const rv = clamp(a * 1.15, 0, 1);                       // the sigil draws itself in
+  const arc = (rr, k = rv) => { ctx.beginPath(); ctx.arc(0, 0, rr, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.stroke(); };
+  ctx.save();
+  ctx.translate(x, y);
+  if (tilt) { ctx.rotate(tilt.phi); ctx.scale(1, tilt.sq); ctx.rotate(-tilt.phi); } // tilts with your palm
+  ctx.globalAlpha = a;
+  ctx.globalCompositeOperation = 'lighter';
+  const core = `rgb(${t.core})`, hot = `rgb(${t.hot})`;
+  const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.15);
+  gr.addColorStop(0, `rgba(${t.core},.08)`); gr.addColorStop(0.7, `rgba(${t.core},.02)`); gr.addColorStop(1, `rgba(${t.core},0)`);
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, r * 1.15, 0, TAU); ctx.fill();
+  ctx.shadowColor = core; ctx.shadowBlur = 7;
+  ctx.strokeStyle = core; ctx.lineWidth = 1.8; arc(r); arc(r * 0.86);
+  ctx.strokeStyle = hot; ctx.lineWidth = 1; arc(r * 1.04); arc(r * 0.995);
+  // outer tick ring, counter-rotating
+  ctx.save(); ctx.rotate(-rot * 0.6); ctx.strokeStyle = core; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for (let i = 0; i < 72 * rv; i++) { const ang = i / 72 * TAU - Math.PI / 2, l = i % 6 ? 1.04 : 1.09; ctx.moveTo(Math.cos(ang) * r * 1.04, Math.sin(ang) * r * 1.04); ctx.lineTo(Math.cos(ang) * r * l, Math.sin(ang) * r * l); }
+  ctx.stroke(); ctx.restore();
+  // rune band
+  ctx.save(); ctx.rotate(rot);
+  ctx.fillStyle = hot; ctx.font = `${Math.max(9, r * 0.1)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = 0; i < Math.floor(24 * rv); i++) { ctx.save(); ctx.rotate(i / 24 * TAU); ctx.fillText(RUNES[i], 0, -r * 0.93); ctx.restore(); }
+  ctx.restore();
+  // interlocking squares
+  ctx.save(); ctx.rotate(-rot * 1.6); ctx.lineWidth = 1.6; ctx.globalAlpha = a * rv;
+  for (let k = 0; k < 2; k++) { ctx.save(); ctx.rotate(k * Math.PI / 4); ctx.strokeRect(-r * 0.6, -r * 0.6, r * 1.2, r * 1.2); ctx.restore(); }
+  ctx.restore();
+  arc(r * 0.6);
+  // inner dial + hexagram
+  ctx.save(); ctx.rotate(rot * 2.4); ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for (let i = 0; i < 48 * rv; i++) {
+    const ang = i / 48 * TAU, l = i % 4 === 0 ? 0.38 : 0.44;
+    ctx.moveTo(Math.cos(ang) * r * l, Math.sin(ang) * r * l); ctx.lineTo(Math.cos(ang) * r * 0.5, Math.sin(ang) * r * 0.5);
+  }
+  ctx.stroke();
+  arc(r * 0.36);
+  ctx.strokeStyle = hot; ctx.lineWidth = 1.6; ctx.globalAlpha = a * rv;
+  poly(ctx, 6, r * 0.36, 2); ctx.rotate(Math.PI / 3); poly(ctx, 6, r * 0.36, 2);
+  ctx.restore();
+  // bright core
+  ctx.globalAlpha = a * rv;
+  const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.18);
+  cg.addColorStop(0, `rgba(${t.hot},.9)`); cg.addColorStop(1, `rgba(${t.core},0)`);
+  ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(0, 0, r * 0.18, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+function boltPath(x1, y1, x2, y2, disp, out) {
+  if (disp < 3) { out.push([x2, y2]); return; }
+  const mx = (x1 + x2) / 2 + (Math.random() - 0.5) * disp;
+  const my = (y1 + y2) / 2 + (Math.random() - 0.5) * disp;
+  boltPath(x1, y1, mx, my, disp / 2, out);
+  boltPath(mx, my, x2, y2, disp / 2, out);
+}
+function drawBolt(x1, y1, x2, y2, width = 3, alpha = 1) {
+  const t = T(), pts = [[x1, y1]];
+  boltPath(x1, y1, x2, y2, Math.hypot(x2 - x1, y2 - y1) * 0.28, pts);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = alpha;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.shadowColor = `rgb(${t.core})`; ctx.shadowBlur = 25;
+  for (const [w, col] of [[width * 3, `rgba(${t.core},.5)`], [width, `rgb(${t.hot})`]]) {
+    ctx.lineWidth = w; ctx.strokeStyle = col;
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+    for (const p of pts) ctx.lineTo(p[0], p[1]);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawOrb(x, y, r, charge) {
+  const t = T();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const gr = ctx.createRadialGradient(x, y, 0, x, y, r * 2.2);
+  gr.addColorStop(0, `rgba(${t.hot},${0.9 * charge})`);
+  gr.addColorStop(0.3, `rgba(${t.core},${0.6 * charge})`);
+  gr.addColorStop(1, `rgba(${t.core},0)`);
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, TAU); ctx.fill();
+  ctx.restore();
+  const n = Math.floor(charge * 2);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, d = r * (1.2 + Math.random());
+    drawBolt(x, y, x + Math.cos(a) * d, y + Math.sin(a) * d, 1.5, charge);
+  }
+}
+function drawInkStroke(a, c, b) {   // smooth quadratic segment a → b through control c
+  const t = T();
+  const seg = () => { ictx.beginPath(); ictx.moveTo(a.x, a.y); ictx.quadraticCurveTo(c.x, c.y, b.x, b.y); ictx.stroke(); };
+  ictx.save();
+  ictx.globalCompositeOperation = 'lighter';
+  ictx.lineCap = 'round'; ictx.lineJoin = 'round';
+  ictx.shadowColor = `rgb(${t.core})`; ictx.shadowBlur = 8;
+  ictx.strokeStyle = `rgba(${t.core},.7)`; ictx.lineWidth = 5; seg();
+  ictx.shadowBlur = 0;
+  ictx.strokeStyle = `rgb(${t.hot})`; ictx.lineWidth = 1.6; seg();
+  ictx.restore();
+}
+const STARS = Array.from({ length: 150 }, () => ({ a: Math.random() * TAU, r: Math.random(), s: 0.004 + Math.random() * 0.012 }));
+let portalRot = 0;
+
+// =====================================================================
+// HANDS
+// =====================================================================
+const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const hands = {};
+function handState(key) {
+  return (hands[key] ||= { key, sig: 0, rot: 0, spin: 0, angle: null, charge: 0, wasFist: false, lastPinch: null, pts: null, seen: false, wasPinch: false, pinchT: 0, pinchUsed: true, pinchState: false, tilt: { phi: 0, sq: 1 } });
+}
+// One Euro filter: rock-steady when you hold still, no lag when you move fast
+function oneEuro(minCutoff, beta) {
+  let x0 = null, dx0 = 0, t0 = 0;
+  const alpha = (cut, dt) => 1 / (1 + 1 / (TAU * cut * dt));
+  return (x, t) => {
+    if (x0 === null) { x0 = x; t0 = t; return x; }
+    const dt = Math.max(1e-3, (t - t0) / 1000); t0 = t;
+    dx0 = lerp(dx0, (x - x0) / dt, alpha(1, dt));
+    x0 = lerp(x0, x, alpha(minCutoff + beta * Math.abs(dx0), dt));
+    return x0;
+  };
+}
+function filterPts(store, raw, t, minCutoff, beta) {
+  if (!store.f || store.f.length !== raw.length) store.f = raw.map(() => [oneEuro(minCutoff, beta), oneEuro(minCutoff, beta)]);
+  return raw.map((p, i) => ({ ...p, x: store.f[i][0](p.x, t), y: store.f[i][1](p.y, t) }));
+}
+// gestures are judged on the model's 3D hand (metres), so they work at any distance or angle
+function analyse(pts, wl, h) {
+  const size = dist(pts[0], pts[9]);
+  const k2 = 0.09 / Math.max(1, size);
+  const d3 = wl
+    ? (a, b) => Math.hypot(wl[a].x - wl[b].x, wl[a].y - wl[b].y, wl[a].z - wl[b].z)
+    : (a, b) => dist(pts[a], pts[b]) * k2;
+  const F = [[8, 6], [12, 10], [16, 14], [20, 18]];
+  const ext = F.map(([tip, pip]) => d3(tip, 0) > d3(pip, 0) * 1.12);
+  const curl = F.map(([tip, pip]) => d3(tip, 0) < d3(pip, 0) * 1.02);
+  const nExt = ext.filter(Boolean).length;
+  // pinch = thumb and index tips touching, judged in 3D *and* on screen (forgiving, with hysteresis).
+  // It is decided before "fist": a normal pinch curls the other three fingers, which must not block it.
+  const pd3 = d3(4, 8), pd2 = dist(pts[4], pts[8]) / Math.max(1, size);
+  const indexOut = d3(8, 0) > d3(5, 0) * 1.15;                 // index reaches past its knuckle
+  h.pinchState = h.pinchState ? (pd3 < 0.065 || pd2 < 0.45) : (indexOut && (pd3 < 0.042 || pd2 < 0.3));
+  const pinch = h.pinchState;
+  // fist = every finger curled, index included, and not pinching
+  const fist = !pinch && (curl.filter(Boolean).length >= 4 || (curl[1] && curl[2] && curl[3] && !indexOut));
+  const palm = [0, 5, 9, 13, 17].reduce((a, i) => ({ x: a.x + pts[i].x / 5, y: a.y + pts[i].y / 5 }), { x: 0, y: 0 });
+  let tilt = { phi: 0, sq: 1 };
+  if (wl) { // palm normal → how the sigil tilts in 3D
+    const ax = wl[5].x - wl[0].x, ay = wl[5].y - wl[0].y, az = wl[5].z - wl[0].z;
+    const bx = wl[17].x - wl[0].x, by = wl[17].y - wl[0].y, bz = wl[17].z - wl[0].z;
+    const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx, nl = Math.hypot(nx, ny, nz) || 1;
+    tilt = { phi: Math.atan2(ny, -nx) - Math.PI / 2, sq: clamp(Math.abs(nz) / nl, 0.32, 1) };
+  }
+  return {
+    size, palm, pinch, fist, tilt,
+    open: nExt === 4 && !pinch,
+    point: ext[0] && !ext[1] && !ext[2] && !ext[3] && !pinch && !fist,
+    angle: Math.atan2(pts[9].y - pts[0].y, pts[9].x - pts[0].x),
+  };
+}
+function gestureName(g) {
+  return g.fist ? '✊ Fist' : g.pinch ? '🤏 Pinch' : g.point ? '☝️ Point' : g.open ? '✋ Open' : '· · ·';
+}
+function drawTag(x, y, text) {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  ctx.font = '600 12px Inter, sans-serif';
+  const w = ctx.measureText(text).width + 22;
+  x = clamp(x, w / 2 + 8, cv.width - w / 2 - 8); y = clamp(y, 70, cv.height - 130);
+  ctx.fillStyle = 'rgba(12,11,20,.74)'; ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(x - w / 2, y, w, 26, 13); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y + 13.5);
+  ctx.restore();
+}
+
+// =====================================================================
+// MESH MODE — an elastic 2D net (Verlet cloth)
+// =====================================================================
+const GX = 19, GY = 19;
+const idx = (i, j) => j * GX + i;
+const LINKS = []; // [a, b, kind]  kind 0 = grid, 1 = diagonal, 2 = anti-diagonal
+for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) {
+  if (i < GX - 1) LINKS.push([idx(i, j), idx(i + 1, j), 0]);
+  if (j < GY - 1) LINKS.push([idx(i, j), idx(i, j + 1), 0]);
+  if (i < GX - 1 && j < GY - 1) { LINKS.push([idx(i, j), idx(i + 1, j + 1), 1]); LINKS.push([idx(i + 1, j), idx(i, j + 1), 2]); }
+}
+const PERIM = [];
+for (let i = 0; i < GX; i++) PERIM.push(idx(i, 0));
+for (let j = 1; j < GY; j++) PERIM.push(idx(GX - 1, j));
+for (let i = GX - 2; i >= 0; i--) PERIM.push(idx(i, GY - 1));
+for (let j = GY - 2; j > 0; j--) PERIM.push(idx(0, j));
+const TIPS = [4, 8, 12, 16, 20];
+// face outline, in order around the face
+const OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+
+let cloth = null, meshStyle = 0, spawnCooldown = 0, webFrames = 0;
+let faceLm = null, faceRes = null, faceSm = null, lastFace = null, TRIS = null;
+
+// ---- shapes: the net is a grid warped to fill any outline ----
+const HAND_OUTLINE = [4, 8, 12, 16, 20, 17, 0, 1];
+const SHAPES = ['blob', 'circle', 'hexagon', 'star', 'heart', 'square'];
+const SHAPE_NAMES = { fingers: 'Fingers', blob: 'Blob', circle: 'Circle', hexagon: 'Hexagon', star: 'Star', heart: 'Heart', square: 'Square' };
+// unit square → unit disc (keeps grid lines smooth and evenly spread)
+const DISC = [];
+for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) {
+  const x = i / (GX - 1) * 2 - 1, y = j / (GY - 1) * 2 - 1;
+  const dx = x * Math.sqrt(1 - y * y / 2), dy = y * Math.sqrt(1 - x * x / 2);
+  DISC.push({ x: dx, y: dy, r: Math.hypot(dx, dy) });
+}
+function presetPoly(name, now) {
+  const t = now / 1000, a = [];
+  const ring = (n, f, start = -Math.PI / 2) => { for (let i = 0; i < n; i++) { const th = start + i / n * TAU, r = f(th, i); a.push({ x: Math.cos(th) * r, y: Math.sin(th) * r }); } };
+  if (name === 'circle') ring(48, () => 1);
+  else if (name === 'blob') ring(48, th => 1 + 0.14 * Math.sin(3 * th + t * 1.3) + 0.08 * Math.sin(5 * th - t * 1.9));
+  else if (name === 'hexagon') ring(6, () => 1);
+  else if (name === 'star') ring(10, (th, i) => (i % 2 ? 0.48 : 1));
+  else if (name === 'square') ring(4, () => 1, -Math.PI / 4);
+  else if (name === 'heart') for (let i = 0; i < 64; i++) {
+    const th = i / 64 * TAU;
+    a.push({ x: 16 * Math.sin(th) ** 3 / 16, y: -(13 * Math.cos(th) - 5 * Math.cos(2 * th) - 2 * Math.cos(3 * th) - Math.cos(4 * th)) / 16 + 0.15 });
+  }
+  return a;
+}
+function unrot(q, c, a) {
+  const dx = q.x - c.x, dy = q.y - c.y, ca = Math.cos(a), sa = Math.sin(a);
+  return { x: dx * ca + dy * sa, y: -dx * sa + dy * ca };
+}
+// shape = { c, a (rotation), k (scale), loc (outline in local px) | preset + baseR }
+function shapeOutline(sh, now) {
+  if (sh.preset) sh.loc = presetPoly(sh.preset, now).map(q => ({ x: q.x * sh.baseR, y: q.y * sh.baseR }));
+  const ca = Math.cos(sh.a), sa = Math.sin(sh.a);
+  return sh.loc.map(q => ({ x: sh.c.x + (q.x * ca - q.y * sa) * sh.k, y: sh.c.y + (q.x * sa + q.y * ca) * sh.k }));
+}
+function shapeRadius(sh) {
+  if (sh.preset) return sh.baseR * sh.k;
+  let m = 0;
+  for (const q of sh.loc) m += Math.hypot(q.x, q.y);
+  return m / sh.loc.length * sh.k;
+}
+function catmullClosed(P, n) {
+  const out = [];
+  for (let i = 0; i < P.length; i++) {
+    const p0 = P[(i - 1 + P.length) % P.length], p1 = P[i], p2 = P[(i + 1) % P.length], p3 = P[(i + 2) % P.length];
+    for (let k = 0; k < n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      out.push({ x: f(p0.x, p1.x, p2.x, p3.x), y: f(p0.y, p1.y, p2.y, p3.y) });
+    }
+  }
+  return out;
+}
+function fingerOutline(tips, c) {
+  const ord = tips.map(q => ({ q, a: Math.atan2(q.y - c.y, q.x - c.x) })).sort((p, q) => p.a - q.a).map(o => o.q);
+  const ctrl = [];
+  for (let i = 0; i < 3; i++) {
+    const p = ord[i], q = ord[(i + 1) % 3], m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+    const dx = m.x - c.x, dy = m.y - c.y, l = Math.hypot(dx, dy) || 1, bulge = Math.max(dist(p, q) * 0.34, 18);
+    ctrl.push(p, { x: m.x + dx / l * bulge, y: m.y + dy / l * bulge });
+  }
+  // never thinner than a soft oval, even when the three fingertips line up
+  const out = catmullClosed(ctrl, 10);
+  const rmax = Math.max(...tips.map(q => dist(q, c))), rmin = rmax * 0.55;
+  return out.map(q => { const d = dist(q, c); return d >= rmin || d < 1e-6 ? q : { x: c.x + (q.x - c.x) / d * rmin, y: c.y + (q.y - c.y) / d * rmin }; });
+}
+function hull(pts) {
+  const p = pts.map(q => ({ x: q.x, y: q.y })).sort((a, b) => a.x - b.x || a.y - b.y);
+  const cr = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function shapeFromCloth() {
+  const P = hull(cloth.pts);
+  const c = P.reduce((a, q) => ({ x: a.x + q.x / P.length, y: a.y + q.y / P.length }), { x: 0, y: 0 });
+  const mid = (GY - 1) >> 1, l = cloth.pts[idx(0, mid)], r = cloth.pts[idx(GX - 1, mid)];
+  const a = Math.atan2(r.y - l.y, r.x - l.x);
+  const sh = { c, a, k: 1, loc: P.map(q => unrot(q, c, a)), preset: null };
+  const maxR = Math.min(cv.width, cv.height) * 0.42, rr = shapeRadius(sh);
+  if (rr > maxR) sh.k = maxR / rr;
+  return sh;
+}
+function rayToPoly(c, dx, dy, poly) {
+  let best = 0;
+  for (let k = 0; k < poly.length; k++) {
+    const a = poly[k], b = poly[(k + 1) % poly.length];
+    const ex = b.x - a.x, ey = b.y - a.y, den = dx * ey - dy * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((a.x - c.x) * ey - (a.y - c.y) * ex) / den;
+    const s = ((a.x - c.x) * dy - (a.y - c.y) * dx) / den;
+    if (t > 0 && s >= 0 && s <= 1) best = Math.max(best, t);
+  }
+  return best;
+}
+function restFromOutline(R, poly, c, rot) {
+  const ca = Math.cos(rot), sa = Math.sin(rot);
+  let fb = 0;
+  for (const p of poly) fb += dist(p, c);
+  fb /= poly.length;
+  for (let i = 0; i < DISC.length; i++) {
+    const d = DISC[i];
+    if (d.r < 1e-6) { R[i].x = c.x; R[i].y = c.y; continue; }
+    const ux = (d.x * ca - d.y * sa) / d.r, uy = (d.x * sa + d.y * ca) / d.r;
+    const L = rayToPoly(c, ux, uy, poly) || fb;
+    R[i].x = c.x + ux * d.r * L; R[i].y = c.y + uy * d.r * L;
+  }
+}
+function setMeshShape(name) {
+  S.meshShape = name;
+  const sh = cloth && cloth.shape;
+  if (sh && cloth.state !== 'web' && cloth.state !== 'applied') {
+    sh.baseR = shapeRadius(sh) / sh.k; sh.preset = name;
+  }
+  toast(`Shape · ${SHAPE_NAMES[name]}`);
+}
+function along(pts, t) {
+  const n = pts.length - 1, f = clamp(t * n, 0, n - 1e-6), i = Math.floor(f), k = f - i;
+  return { x: lerp(pts[i].x, pts[i + 1].x, k), y: lerp(pts[i].y, pts[i + 1].y, k) };
+}
+
+function newCloth(c) {
+  const pts = [];
+  for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) {
+    const x = c.x + (Math.random() - 0.5) * 6, y = c.y + (Math.random() - 0.5) * 6;
+    pts.push({ x, y, px: x, py: y, u: i / (GX - 1), v: j / (GY - 1) });
+  }
+  cloth = {
+    pts, state: 'held', holder: null, frame: null, v: { x: 0, y: 0 }, av: 0, grabs: [], pins: [],
+    rest: pts.map(() => ({ x: 0, y: 0 })), restLen: new Float32Array(LINKS.length),
+    vis: new Float32Array(pts.length).fill(1), bind: null, alpha: 1, snap: 0, lostH: 0, webLost: 0, bindT: 0,
+  };
+}
+function cellSize() { return cloth.shape ? shapeRadius(cloth.shape) * 2 / (GX - 1) : 20; }
+function meshCol(u, l = 64, a = 1) { const [h1, h2] = T().mesh; return `hsla(${lerp(h1, h2, u)},95%,${l}%,${a})`; }
+
+function dissolveMesh() {
+  if (!cloth) return;
+  for (let i = 0; i < cloth.pts.length; i += 2) {
+    const p = cloth.pts[i];
+    if (cloth.vis[i] < 0.5) continue;
+    const a = Math.random() * TAU, sp = 1 + Math.random() * 5;
+    emit(p.x, p.y, Math.cos(a) * sp, Math.sin(a) * sp - 1, 30 + Math.random() * 30, 2 + Math.random() * 2.5, { g: 0.06, crisp: true, col: meshCol(p.u, 72) });
+  }
+  cloth = null;
+  spawnCooldown = performance.now() + 600;
+  for (const k in hands) hands[k].pinchUsed = true;
+  toast('Mesh dissolved');
+}
+
+// --- face binding: warp the whole net to fill the face outline ---
+function bary(p, a, b, c) {
+  const v0x = b.x - a.x, v0y = b.y - a.y, v1x = c.x - a.x, v1y = c.y - a.y, v2x = p.x - a.x, v2y = p.y - a.y;
+  const den = v0x * v1y - v1x * v0y;
+  if (Math.abs(den) < 1e-6) return null;
+  const v = (v2x * v1y - v1x * v2y) / den, w = (v0x * v2y - v2x * v0y) / den, u = 1 - v - w;
+  return u >= -1e-3 && v >= -1e-3 && w >= -1e-3 ? [u, v, w] : null;
+}
+function faceFrame(F) {
+  const e1 = F[33], e2 = F[263];
+  return { c: { x: (F[10].x + F[152].x) / 2, y: (F[10].y + F[152].y) / 2 }, a: Math.atan2(e2.y - e1.y, e2.x - e1.x), s: Math.max(1, dist(e1, e2)) };
+}
+function toLocal(fr, p) {
+  const ca = Math.cos(fr.a), sa = Math.sin(fr.a), dx = p.x - fr.c.x, dy = p.y - fr.c.y;
+  return { x: (dx * ca + dy * sa) / fr.s, y: (-dx * sa + dy * ca) / fr.s };
+}
+function fromLocal(fr, l) {
+  const ca = Math.cos(fr.a), sa = Math.sin(fr.a);
+  return { x: fr.c.x + (l.x * ca - l.y * sa) * fr.s, y: fr.c.y + (l.x * sa + l.y * ca) * fr.s };
+}
+// distance from c to the face outline along direction (dx, dy)
+function rayToOval(c, dx, dy, F) {
+  let best = 0;
+  for (let k = 0; k < OVAL.length; k++) {
+    const a = F[OVAL[k]], b = F[OVAL[(k + 1) % OVAL.length]];
+    const ex = b.x - a.x, ey = b.y - a.y, den = dx * ey - dy * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((a.x - c.x) * ey - (a.y - c.y) * ex) / den;
+    const s = ((a.x - c.x) * dy - (a.y - c.y) * dx) / den;
+    if (t > 0 && s >= 0 && s <= 1) best = Math.max(best, t);
+  }
+  return best;
+}
+function bindToFace(face) {
+  const F = face.pts, fr = faceFrame(F);
+  // undo head roll, then wrap the face onto a gentle ellipsoid so the grid hugs its curve:
+  // lines bunch up towards the cheeks and jaw like a fitted mask, for any face shape
+  const L0 = F.map(p => toLocal(fr, p));
+  const ov0 = OVAL.map(i => L0[i]);
+  const cx = ov0.reduce((a, q) => a + q.x, 0) / ov0.length, cy = ov0.reduce((a, q) => a + q.y, 0) / ov0.length;
+  let rx = 0, ry = 0;
+  for (const q of ov0) { rx = Math.max(rx, Math.abs(q.x - cx)); ry = Math.max(ry, Math.abs(q.y - cy)); }
+  rx *= 1.06; ry *= 1.35;
+  const UV = L0.map(q => ({ x: Math.asin(clamp((q.x - cx) / rx, -1, 1)), y: Math.asin(clamp((q.y - cy) / ry, -1, 1)) }));
+  const ov = OVAL.map(i => UV[i]);
+  const c = { x: ov.reduce((a, q) => a + q.x, 0) / ov.length, y: ov.reduce((a, q) => a + q.y, 0) / ov.length };
+  const down = Math.sign(UV[152].y - UV[10].y) || 1;
+  const bbs = TRIS.map(([a, b, d]) => [Math.min(UV[a].x, UV[b].x, UV[d].x), Math.max(UV[a].x, UV[b].x, UV[d].x), Math.min(UV[a].y, UV[b].y, UV[d].y), Math.max(UV[a].y, UV[b].y, UV[d].y)]);
+  const area = ([a, b, d]) => Math.abs((UV[b].x - UV[a].x) * (UV[d].y - UV[a].y) - (UV[d].x - UV[a].x) * (UV[b].y - UV[a].y));
+  cloth.bind = DISC.map(d => {
+    let q = c;
+    if (d.r > 1e-6) {
+      const ux = d.x / d.r, uy = d.y * down / d.r, Lr = rayToPoly(c, ux, uy, ov) * 0.99;
+      q = { x: c.x + ux * d.r * Lr, y: c.y + uy * d.r * Lr };
+    }
+    // the smallest containing triangle — avoids the stray "triangles" that cause wobbly lines
+    let best = null, ba = Infinity;
+    for (let t = 0; t < TRIS.length; t++) {
+      const bb = bbs[t];
+      if (q.x < bb[0] - 1e-3 || q.x > bb[1] + 1e-3 || q.y < bb[2] - 1e-3 || q.y > bb[3] + 1e-3) continue;
+      const tr = TRIS[t], w = bary(q, UV[tr[0]], UV[tr[1]], UV[tr[2]]);
+      if (w) { const ar = area(tr); if (ar < ba) { ba = ar; best = { tri: tr, w }; } }
+    }
+    if (best) return best;
+    let ni = 0, nd = Infinity;
+    UV.forEach((p, i) => { const dd = (p.x - q.x) ** 2 + (p.y - q.y) ** 2; if (dd < nd) { nd = dd; ni = i; } });
+    return { tri: [ni, ni, ni], w: [1, 0, 0] };
+  });
+  const sc = fromLocal(fr, { x: cx, y: cy });
+  cloth.state = 'applied'; cloth.snap = 0; cloth.grabs = []; cloth.holder = null; cloth.alpha = 1;
+  RINGS.push({ x: sc.x, y: sc.y, r: 20, v: 16, life: 30, max: 30, crisp: true, col: meshCol(0.5, 80) });
+  toast('Mask on — pinch it to peel it off');
+  EV.add('applied');
+}
+function peelOff() {
+  cloth.state = 'floating'; cloth.noAttach = true; cloth.dwell = 0;
+  EV.add('peel');
+  cloth.shape = shapeFromCloth();
+  cloth.bind = null; cloth.v = { x: 0, y: 0 }; cloth.av = 0;
+  for (const p of cloth.pts) { p.px = p.x; p.py = p.y; }
+  toast('Peeled off');
+}
+function release(face, deliberate) {
+  cloth.state = 'floating'; cloth.holder = null; cloth.releasedT = performance.now(); cloth.tipPins = null; cloth.sail = null;
+  if (!cloth.shape) cloth.shape = shapeFromCloth();
+  if (deliberate) cloth.v = { x: 0, y: 0 };
+  const slow = deliberate || Math.hypot(cloth.v.x, cloth.v.y) < 7; // a fast release is a throw, not a drop
+  if (face && TRIS && slow && !cloth.noAttach && dist(cloth.shape.c, face.center) < face.width * 0.6) {
+    cloth.state = 'binding'; cloth.bindT = performance.now();
+    cloth.v = { x: 0, y: 0 };
+    toast('Move your hand away…');
+  }
+}
+
+function nearestPt(p, visibleOnly) {
+  let best = -1, bd = Infinity;
+  cloth.pts.forEach((q, i) => {
+    if (visibleOnly && cloth.vis[i] < 0.5) return;
+    const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+    if (d < bd) { bd = d; best = i; }
+  });
+  return [best, Math.sqrt(bd)];
+}
+
+// Mesh controls — pinch to grab (like Vision Pro / Quest):
+//   🤏 pinch on the mesh        → grab it, move your hand to carry it
+//   ✋ open your fingers         → drop it (fast = throw; over your face = wear it)
+//   🤏 pinch the mask           → take it off
+//   🤏🤏 pinch with both hands   → stretch & rotate
+function strokePts(pts, close) {
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+  if (close) ctx.closePath();
+}
+// pinch cursor: a ring between thumb and index — hollow when open, filled while pinching
+function drawCursors(live) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  for (const h of live) {
+    if (!h.pinchPt) continue;
+    const on = h.holding || h.g.pinch, r = on ? 7 : 10;
+    ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.fillStyle = on ? '#fff' : 'rgba(255,255,255,.12)';
+    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(h.pinchPt.x, h.pinchPt.y, r, 0, TAU); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+function spawnFloating(W, H) {
+  const c = { x: W * 0.5, y: H * 0.52 };
+  newCloth(c);
+  cloth.state = 'floating'; cloth.grabs = []; cloth.v = { x: 0, y: 0 }; cloth.av = 0;
+  cloth.shape = { c: { ...c }, a: 0, k: 1, preset: S.meshShape, baseR: Math.min(W, H) * 0.15, loc: null };
+}
+function letGo(face) {
+  cloth.st = null;
+  EV.add('drop');
+  const slow = Math.hypot(cloth.v.x, cloth.v.y) < 9;
+  if (face && TRIS && slow && !cloth.noAttach && dist(cloth.shape.c, face.center) < face.width * 0.65) {
+    cloth.state = 'binding'; cloth.bindT = performance.now(); cloth.v = { x: 0, y: 0 };
+    toast('Move your hand away…');
+  }
+}
+
+function meshStep(now, live, face) {
+  const act = {}, W = cv.width, H = cv.height;
+  if (face) lastFace = { ...face, t: now };
+  const recentFace = lastFace && now - lastFace.t < 1500 ? lastFace : null;
+  const byKey = k => live.find(h => h.key === k);
+  if (!cloth) { if (now < spawnCooldown) return act; spawnFloating(W, H); }
+
+  for (const h of live) {
+    const p = h.pts, raw = { x: (p[4].x + p[8].x) / 2, y: (p[4].y + p[8].y) / 2 };
+    h.pinchPt = h.pinchPt ? { x: lerp(h.pinchPt.x, raw.x, 0.6), y: lerp(h.pinchPt.y, raw.y, 0.6) } : raw;
+    // debounced hold: starts after 2 pinched frames, ends only after 4 open frames — no accidental drops
+    h.pinchN = h.g.pinch ? (h.pinchN || 0) + 1 : 0;
+    h.openRun = h.g.pinch ? 0 : (h.openRun || 0) + 1;
+    h.holding = h.holding ? h.openRun < 4 : h.pinchN >= 2;
+    h.pinchStart = h.holding && !h.wasHolding;
+    h.wasHolding = h.holding;
+  }
+  const reach = () => Math.max(60, cellSize() * 3);
+
+  // grab: pinch anywhere on (or near) the mesh — or on the mask
+  for (const h of live) {
+    if (!h.pinchStart || cloth.state === 'binding' || cloth.grabs.some(g => g.key === h.key)) continue;
+    if (cloth.state === 'applied') {
+      if (!face || dist(h.pinchPt, face.center) > face.width * 0.6) continue;
+      peelOff();
+    } else if (dist(h.pinchPt, cloth.shape.c) > shapeRadius(cloth.shape) + 50 && nearestPt(h.pinchPt, false)[1] > reach()) continue;
+    const [i] = nearestPt(h.pinchPt, false);
+    cloth.grabs.push({ key: h.key, i, t: { ...h.pinchPt }, lost: 0 });
+    cloth.state = 'floating';
+    EV.add('grab');
+    RINGS.push({ x: h.pinchPt.x, y: h.pinchPt.y, r: 6, v: 5, life: 18, max: 18, crisp: true, col: 'rgba(255,255,255,.9)' });
+  }
+
+  // hold or let go
+  const had = cloth.grabs.length;
+  cloth.grabs = cloth.grabs.filter(g => {
+    const h = byKey(g.key);
+    if (h && h.holding) { g.lost = 0; g.t = { ...h.pinchPt }; h.mtag = '🤏 Holding  ·  open your fingers to drop'; return true; }
+    if (!h && ++g.lost <= 8) return true; // tracking blinked for a moment: keep holding
+    return false;
+  });
+  if (had && !cloth.grabs.length) letGo(recentFace);
+
+  // hints for free hands
+  for (const h of live) {
+    if (h.holding) continue;
+    if (cloth.state === 'applied') {
+      if (face && dist(h.pinchPt, face.center) < face.width * 0.6) h.mtag = '🤏 Pinch to take it off';
+    } else if (cloth.state === 'floating') {
+      const [i, d] = nearestPt(h.pinchPt, false);
+      if (d < reach() || dist(h.pinchPt, cloth.shape.c) < shapeRadius(cloth.shape) + 50) {
+        h.mtag = cloth.grabs.length ? '🤏 Pinch too, to stretch' : '🤏 Pinch to grab';
+        const q = cloth.pts[i];
+        ctx.save(); ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.3; ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.arc(q.x, q.y, 12, 0, TAU); ctx.stroke(); ctx.restore();
+      }
+    }
+  }
+
+  // move: carry with one hand, stretch & rotate with two, drift when free
+  if (cloth.state === 'floating') {
+    const sh = cloth.shape, prevC = { ...sh.c }, gs = cloth.grabs;
+    if (gs.length < 2) cloth.st = null;
+    if (gs.length === 1) {
+      act.grab = 1;
+      const g = gs[0], r = cloth.rest[g.i];
+      sh.c.x += (g.t.x - r.x) * 0.5; sh.c.y += (g.t.y - r.y) * 0.5;
+    } else if (gs.length >= 2) {
+      act.grab = 1; act.stretch = 1;
+      const [g1, g2] = gs;
+      const mid = { x: (g1.t.x + g2.t.x) / 2, y: (g1.t.y + g2.t.y) / 2 };
+      const d = Math.max(1, dist(g1.t, g2.t)), ang = Math.atan2(g2.t.y - g1.t.y, g2.t.x - g1.t.x);
+      const key = g1.key + g2.key;
+      if (!cloth.st || cloth.st.key !== key) cloth.st = { key, d0: d, ang0: ang, mid0: mid, k0: sh.k, a0: sh.a, c0: { ...sh.c } };
+      const S0 = cloth.st, k = clamp(d / S0.d0, 0.35, 3.5);
+      let da = ang - S0.ang0;
+      if (da > Math.PI) da -= TAU; if (da < -Math.PI) da += TAU;
+      sh.k = S0.k0 * k;
+      const maxR = Math.min(W, H) * 0.7, r0 = shapeRadius(sh);
+      if (r0 > maxR) sh.k *= maxR / r0;
+      if (r0 < 25) sh.k *= 25 / r0;
+      sh.a = S0.a0 + da;
+      const ox = (S0.c0.x - S0.mid0.x) * k, oy = (S0.c0.y - S0.mid0.y) * k, ca = Math.cos(da), sa = Math.sin(da);
+      sh.c.x = lerp(sh.c.x, mid.x + ox * ca - oy * sa, 0.5);
+      sh.c.y = lerp(sh.c.y, mid.y + ox * sa + oy * ca, 0.5);
+    } else {
+      sh.c.x += cloth.v.x; sh.c.y += cloth.v.y;
+      cloth.v.x *= 0.95; cloth.v.y *= 0.95;
+      const r = shapeRadius(sh) * 0.8;
+      if (sh.c.x < r) { sh.c.x = r; cloth.v.x = Math.abs(cloth.v.x) * 0.6; }
+      if (sh.c.x > W - r) { sh.c.x = W - r; cloth.v.x = -Math.abs(cloth.v.x) * 0.6; }
+      if (sh.c.y < r) { sh.c.y = r; cloth.v.y = Math.abs(cloth.v.y) * 0.6; }
+      if (sh.c.y > H - r) { sh.c.y = H - r; cloth.v.y = -Math.abs(cloth.v.y) * 0.6; }
+      if (Math.hypot(cloth.v.x, cloth.v.y) > 3) act.throw = 1;
+    }
+    if (gs.length) cloth.v = { x: lerp(cloth.v.x, sh.c.x - prevC.x, 0.5), y: lerp(cloth.v.y, sh.c.y - prevC.y, 0.5) };
+    // carrying it over your face: show where it will sit
+    if (gs.length && face && TRIS && !cloth.noAttach && dist(sh.c, face.center) < face.width * 0.65) {
+      act.face = 1;
+      ctx.save(); ctx.globalCompositeOperation = 'source-over';
+      ctx.setLineDash([5, 7]); ctx.lineDashOffset = -now / 40;
+      ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5;
+      strokePts(OVAL.map(i => face.pts[i]), true); ctx.stroke();
+      ctx.restore();
+      drawTag(face.center.x, face.center.y - face.width * 0.95, '✋ Open your fingers to wear it');
+    }
+    if (cloth.noAttach && (!face || dist(sh.c, face.center) > face.width * 0.9)) cloth.noAttach = false;
+  }
+
+  if (cloth.state === 'binding') {
+    act.face = 1;
+    if (face && performance.now() - cloth.bindT > 200) bindToFace(face);
+    else if (performance.now() - cloth.bindT > 3500) { cloth.state = 'floating'; toast('Couldn’t see your face — try again'); }
+  }
+
+  // worn: every point rides the face landmarks
+  if (cloth.state === 'applied') {
+    act.face = 1;
+    if (face) {
+      cloth.snap = Math.min(1, cloth.snap + 0.06);
+      cloth.alpha = lerp(cloth.alpha, 1, 0.2);
+      const k = 0.2 + 0.8 * cloth.snap, F = face.pts, fr = faceFrame(F);
+      cloth.pts.forEach((p, i) => {
+        const b = cloth.bind[i];
+        let q;
+        if (b.tri) { const [a, bb, c] = b.tri, [w1, w2, w3] = b.w; q = { x: F[a].x * w1 + F[bb].x * w2 + F[c].x * w3, y: F[a].y * w1 + F[bb].y * w2 + F[c].y * w3 }; }
+        else q = fromLocal(fr, b.local);
+        p.x = lerp(p.x, q.x, k); p.y = lerp(p.y, q.y, k); p.px = p.x; p.py = p.y;
+      });
+    } else cloth.alpha = lerp(cloth.alpha, 0.3, 0.1);
+    drawMesh(now, live); drawCursors(live);
+    return act;
+  }
+
+  // rest shape, pins at the pinch points
+  const R = cloth.rest, pins = [];
+  restFromOutline(R, shapeOutline(cloth.shape, now), cloth.shape.c, cloth.shape.a);
+  for (const g of cloth.grabs) pins.push({ i: g.i, x: g.t.x, y: g.t.y, a: 1 });
+  cloth.pins = pins;
+
+  // Verlet physics: a soft, elastic net
+  const Q = cloth.pts;
+  const kS = cloth.grabs.length ? 0.14 : 0.08;
+  for (let i = 0; i < Q.length; i++) {
+    const p = Q[i], vx = (p.x - p.px) * 0.86, vy = (p.y - p.py) * 0.86;
+    p.px = p.x; p.py = p.y;
+    p.x += vx + (R[i].x - p.x) * kS;
+    p.y += vy + (R[i].y - p.y) * kS;
+  }
+  const pinned = new Uint8Array(Q.length);
+  for (const q of pins) { pinned[q.i] = 1; Q[q.i].x = q.x; Q[q.i].y = q.y; }
+  for (let k = 0; k < LINKS.length; k++) { const [a, b] = LINKS[k]; cloth.restLen[k] = dist(R[a], R[b]); }
+  for (let it = 0; it < 4; it++) {
+    for (let k = 0; k < LINKS.length; k++) {
+      const [a, b, kind] = LINKS[k], pa = Q[a], pb = Q[b];
+      const wa = pinned[a] ? 0 : 1, wb = pinned[b] ? 0 : 1, ws = wa + wb;
+      if (!ws) continue;
+      const dx = pb.x - pa.x, dy = pb.y - pa.y, d = Math.hypot(dx, dy) || 1e-3;
+      const c = (d - cloth.restLen[k]) / d * (kind ? 0.3 : 0.6);
+      pa.x += dx * c * wa / ws; pa.y += dy * c * wa / ws;
+      pb.x -= dx * c * wb / ws; pb.y -= dy * c * wb / ws;
+    }
+  }
+  drawMesh(now, live); drawCursors(live);
+  return act;
+}
+
+function drawMesh(now, live) {
+  const Q = cloth.pts, NB = 8, applied = cloth.state === 'applied';
+  const paths = Array.from({ length: NB * 3 }, () => new Path2D());
+  const diag = Array.from({ length: NB }, () => new Path2D());
+  for (let k = 0; k < LINKS.length; k++) {
+    const [a, b, kind] = LINKS[k];
+    if (kind === 2 || (kind === 1 && !meshStyle)) continue;
+    const pa = Q[a], pb = Q[b];
+    const hb = Math.min(NB - 1, ((pa.u + pb.u) / 2 * NB) | 0);
+    if (kind === 1) { diag[hb].moveTo(pa.x, pa.y); diag[hb].lineTo(pb.x, pb.y); continue; }
+    let lvl = 0;
+    if (!applied) { const s = dist(pa, pb) / (cloth.restLen[k] || 1); lvl = s > 1.35 ? 2 : s > 1.1 ? 1 : 0; }
+    const p = paths[hb * 3 + lvl];
+    p.moveTo(pa.x, pa.y); p.lineTo(pb.x, pb.y);
+  }
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = cloth.alpha;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let hb = 0; hb < NB; hb++) {
+    const u = (hb + 0.5) / NB;
+    ctx.strokeStyle = meshCol(u, 66, 0.4); ctx.lineWidth = 0.7; ctx.stroke(diag[hb]);
+    ctx.strokeStyle = meshCol(u, 64, 0.92); ctx.lineWidth = 1; ctx.stroke(paths[hb * 3]);
+    ctx.strokeStyle = meshCol(u, 80, 1); ctx.lineWidth = 1.35; ctx.stroke(paths[hb * 3 + 1]);
+    ctx.strokeStyle = meshCol(u, 94, 1); ctx.lineWidth = 1.7; ctx.stroke(paths[hb * 3 + 2]);
+  }
+  // gradient border
+  const a = Q[idx(0, 0)], b = Q[idx(GX - 1, GY - 1)];
+  const [h1, h2] = T().mesh;
+  const grad = ctx.createLinearGradient(a.x, a.y, b.x + 0.01, b.y + 0.01);
+  grad.addColorStop(0, `hsl(${h1},95%,70%)`); grad.addColorStop(1, `hsl(${h2},95%,70%)`);
+  ctx.beginPath();
+  PERIM.forEach((i, n) => n ? ctx.lineTo(Q[i].x, Q[i].y) : ctx.moveTo(Q[i].x, Q[i].y));
+  ctx.closePath();
+  ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.stroke();
+  // nodes
+  const nodes = new Path2D();
+  for (const p of Q) { nodes.moveTo(p.x + 1.3, p.y); nodes.arc(p.x, p.y, 1.3, 0, TAU); }
+  ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fill(nodes);
+  // anchors
+  if (!applied) for (const q of cloth.pins) if (q.a) {
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(q.x, q.y, 7, 0, TAU); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(q.x, q.y, 2.5, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// =====================================================================
+// tracking setup
+// =====================================================================
+let landmarker = null;
+const beginBtn = $('begin');
+(async () => {
+  try {
+    const fs = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    const hopts = (delegate) => ({
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate },
+      runningMode: 'VIDEO', numHands: 2,
+      minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.55, minTrackingConfidence: 0.55,
+    });
+    try { landmarker = await HandLandmarker.createFromOptions(fs, hopts('GPU')); }
+    catch { landmarker = await HandLandmarker.createFromOptions(fs, hopts('CPU')); }
+    $('status').textContent = 'ready';
+    beginBtn.disabled = false; beginBtn.textContent = 'Start camera';
+    // face model, for wearing the mesh (loads in the background)
+    const fopts = (delegate) => ({
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', delegate },
+      runningMode: 'VIDEO', numFaces: 1,
+    });
+    try { faceLm = await FaceLandmarker.createFromOptions(fs, fopts('GPU')); }
+    catch { faceLm = await FaceLandmarker.createFromOptions(fs, fopts('CPU')); }
+    TRIS = buildTris(FaceLandmarker.FACE_LANDMARKS_TESSELATION);
+  } catch (e) {
+    $('err').textContent = 'Could not load the hand model: ' + e.message;
+  }
+})();
+// MediaPipe ships the face mesh as edges; recover its triangles
+function buildTris(edges) {
+  const adj = new Map();
+  const add = (a, b) => { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); };
+  for (const { start: a, end: b } of edges) { add(a, b); add(b, a); }
+  const seen = new Set(), tris = [];
+  for (const { start: a, end: b } of edges) for (const c of adj.get(a)) {
+    if (c === b || !adj.get(b).has(c)) continue;
+    const k = [a, b, c].sort((x, y) => x - y), key = k.join(',');
+    if (!seen.has(key)) { seen.add(key); tris.push(k); }
+  }
+  return tris;
+}
+
+let running = false;
+beginBtn.onclick = async () => {
+  if (running) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false });
+    video.srcObject = stream;
+    await video.play();
+    $('intro').classList.add('out');
+    running = true;
+    coachRender();
+    requestAnimationFrame(loop);
+  } catch (e) {
+    $('err').textContent = 'Camera unavailable: ' + e.message + '. Allow camera access and open this page over http://localhost or https.';
+  }
+};
+
+// =====================================================================
+// main loop
+// =====================================================================
+let lastVideoTime = -1, results = null, fpsT = performance.now(), frames = 0, lastHandT = 0;
+const faceF = {}, FX = { flash: 0, shake: 0 }, EV = new Set();
+let faceTick = 0;
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const W = cv.width, H = cv.height;
+  if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+    results = landmarker.detectForVideo(video, now);
+    faceTick = (faceTick + 1) % 2;
+    if (S.mode === 'mesh' && faceLm && (faceTick === 0 || cloth?.state === 'applied' || cloth?.state === 'binding')) faceRes = faceLm.detectForVideo(video, now);
+    else if (S.mode !== 'mesh') faceRes = null;
+  }
+
+  // cover-fit, mirrored
+  const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
+  const sc = Math.max(W / vw, H / vh), dw = vw * sc, dh = vh * sc, ox = (W - dw) / 2, oy = (H - dh) / 2;
+  const map = l => ({ x: W - (ox + l.x * dw), y: oy + l.y * dh });
+
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  ctx.setTransform(1, 0, 0, 1, (Math.random() - 0.5) * FX.shake, (Math.random() - 0.5) * FX.shake);
+  FX.shake *= 0.86;
+  ctx.fillStyle = '#06050b'; ctx.fillRect(-40, -40, W + 80, H + 80);
+  if (S.showVideo) {
+    ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1);
+    ctx.globalAlpha = S.mode === 'mesh' ? 0.7 : 0.55;
+    ctx.drawImage(video, ox, oy, dw, dh);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(6,5,11,.25)'; ctx.fillRect(0, 0, W, H);
+  }
+
+  ictx.save();
+  ictx.globalCompositeOperation = 'destination-out';
+  ictx.fillStyle = 'rgba(0,0,0,0.035)'; ictx.fillRect(0, 0, W, H);
+  ictx.restore();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.drawImage(ink, 0, 0);
+
+  // ---- hands ----
+  for (const k in hands) hands[k].seen = false;
+  const live = [];
+  if (results?.landmarks?.length) {
+    results.landmarks.forEach((lm, i) => {
+      const key = results.handedness?.[i]?.[0]?.categoryName ?? 'H' + i;
+      if (live.some(h => h.key === key)) return;
+      const h = handState(key);
+      h.seen = true;
+      const raw = lm.map(map);
+      h.pts = filterPts(h, raw, now, 1.1, 0.03);
+      h.g = analyse(h.pts, results.worldLandmarks?.[i], h);
+      live.push(h);
+      if (h.angle !== null) {
+        let d = h.g.angle - h.angle;
+        if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU;
+        h.spin = lerp(h.spin, d, 0.3);
+      }
+      h.angle = h.g.angle;
+      h.rot += 0.012 + h.spin * 1.2;
+    });
+  }
+
+  // ---- face (mesh mode) ----
+  let face = null;
+  if (S.mode === 'mesh' && faceRes?.faceLandmarks?.length) {
+    const raw = faceRes.faceLandmarks[0].map(map);
+    faceSm = filterPts(faceF, raw, now, 1.0, 0.015);
+    face = { pts: faceSm, center: { x: (faceSm[10].x + faceSm[152].x) / 2, y: (faceSm[10].y + faceSm[152].y) / 2 }, width: dist(faceSm[234], faceSm[454]) };
+  } else if (S.mode === 'mesh' && faceRes) { faceSm = null; faceF.f = null; }
+
+  const aura = S.mode === 'aura';
+  const active = {};
+  const bothOpen = aura && live.length === 2 && live.every(h => h.g.open);
+  const bothPoint = aura && live.length === 2 && live.every(h => h.g.point);
+
+  for (const key in hands) {
+    const h = hands[key];
+    if (!h.seen) {
+      h.wasPinch = false; h.sig = lerp(h.sig, 0, 0.15); h.lastPinch = null; h.charge *= 0.9; h.angle = null; h.ptip = null;
+      if (h.sig < 0.01) { h.gone = (h.gone || 0) + 1; if (h.gone > 30) delete hands[key]; else if (h.gone > 6) h.f = null; }
+      continue;
+    }
+    h.gone = 0;
+    const g = h.g, pts = h.pts, t = T();
+
+    if (S.showSkel) {
+      ctx.save(); ctx.globalCompositeOperation = aura ? 'lighter' : 'source-over';
+      ctx.strokeStyle = aura ? `rgba(${t.core},.5)` : 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const [a, b] of BONES) { ctx.moveTo(pts[a].x, pts[a].y); ctx.lineTo(pts[b].x, pts[b].y); }
+      ctx.stroke(); ctx.restore();
+    }
+
+    if (!aura) {
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(255,255,255,.9)';
+      for (const tip of TIPS) { ctx.beginPath(); ctx.arc(pts[tip].x, pts[tip].y, 3, 0, TAU); ctx.fill(); }
+      h.tag = '';   // mesh: only contextual hints, no gesture chatter
+      h.sig = 0; h.charge = 0; h.wasFist = false; h.lastPinch = null;
+      continue;
+    }
+
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.75; ctx.fillStyle = `rgb(${t.hot})`;
+    for (const tip of TIPS) { ctx.beginPath(); ctx.arc(pts[tip].x, pts[tip].y, 2.2, 0, TAU); ctx.fill(); }
+    ctx.globalAlpha = 1;
+
+    // open palm → sigil shield
+    h.sig = lerp(h.sig, g.open && !bothOpen ? 1 : 0, g.open ? 0.12 : 0.18);
+    if (g.open && !bothOpen) active.open = 1;
+    if (h.sig > 0.02) {
+      const r = g.size * 1.9 * (0.55 + 0.45 * h.sig);
+      let dphi = g.tilt.phi - h.tilt.phi; if (dphi > Math.PI) dphi -= TAU; if (dphi < -Math.PI) dphi += TAU;
+      h.tilt = { phi: h.tilt.phi + dphi * 0.25, sq: lerp(h.tilt.sq, g.tilt.sq, 0.25) };
+      drawSigil(g.palm.x, g.palm.y, r, h.rot, h.sig, h.tilt);
+      const n = Math.floor(Math.abs(h.spin) * 30), dir = h.spin >= 0 ? 1 : -1;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * TAU, sp = 2 + Math.random() * 3 + Math.abs(h.spin) * 80;
+        emit(g.palm.x + Math.cos(a) * r, g.palm.y + Math.sin(a) * r,
+             -Math.sin(a) * sp * dir + Math.cos(a) * 0.8, Math.cos(a) * sp * dir + Math.sin(a) * 0.8,
+             16 + Math.random() * 16, 2 + Math.random() * 2.5, { g: 0.05, drag: 0.93 });
+      }
+    }
+    // pinch → draw light
+    if (g.pinch) {
+      active.pinch = 1;
+      const px = (pts[4].x + pts[8].x) / 2, py = (pts[4].y + pts[8].y) / 2, P0 = { x: px, y: py };
+      if (h.lastPinch) {
+        const m = { x: (h.lastPinch.x + px) / 2, y: (h.lastPinch.y + py) / 2 };
+        drawInkStroke(h.lastMid || h.lastPinch, h.lastPinch, m);
+        h.lastMid = m;
+      }
+      h.lastPinch = P0;
+    } else { h.lastPinch = null; h.lastMid = null; }
+    // point → fire stream
+    if (g.point && !bothPoint) {
+      active.point = 1;
+      const tip = pts[8], dx = pts[8].x - pts[6].x, dy = pts[8].y - pts[6].y, len = Math.hypot(dx, dy) || 1;
+      for (let i = 0; i < 3; i++) {
+        const sp = 6 + Math.random() * 8, ux = dx / len + (Math.random() - .5) * 0.25, uy = dy / len + (Math.random() - .5) * 0.25;
+        emit(tip.x, tip.y, ux * sp, uy * sp, 18 + Math.random() * 14, 3 + Math.random() * 4, { drag: 0.95, g: -0.06 });
+      }
+    }
+    // fist → charge, open → burst
+    if (g.fist) {
+      active.fist = 1;
+      h.charge = Math.min(1, h.charge + 0.022);
+      drawOrb(g.palm.x, g.palm.y, g.size * 0.35 * (0.4 + h.charge), h.charge);
+      // charge ring
+      const rr = g.size * 1.05, full = h.charge >= 1;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = `rgba(${t.core},.22)`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(g.palm.x, g.palm.y, rr, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = `rgb(${t.hot})`; ctx.lineWidth = full ? 4 + Math.sin(now / 60) * 1.5 : 3.5; ctx.lineCap = 'round';
+      ctx.shadowColor = `rgb(${t.core})`; ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.arc(g.palm.x, g.palm.y, rr, -Math.PI / 2, -Math.PI / 2 + TAU * h.charge); ctx.stroke();
+      ctx.restore();
+    } else {
+      if (h.wasFist && h.charge > 0.15) {
+        FX.flash = 0.12 + 0.25 * h.charge; FX.shake = 2 + 6 * h.charge; EV.add('burst');
+        const n = Math.floor(110 * h.charge);
+        for (let i = 0; i < n; i++) {
+          const a = Math.random() * TAU, sp = 4 + Math.random() * 16 * h.charge;
+          emit(g.palm.x, g.palm.y, Math.cos(a) * sp, Math.sin(a) * sp, 40 + Math.random() * 40, 4 + Math.random() * 7, { drag: 0.95, g: 0.05 });
+        }
+        RINGS.push({ x: g.palm.x, y: g.palm.y, r: g.size * 0.5, v: 22 * h.charge + 6, life: 40, max: 40, theme: S.theme });
+      }
+      h.charge = Math.max(0, h.charge - 0.05);
+    }
+    h.wasFist = g.fist;
+    h.tag = g.fist ? `✊ ${Math.round(h.charge * 100)}%` : g.pinch ? '🤏 Draw' : g.point ? '☝️ Fire' : g.open ? (bothOpen ? '🙌 Portal' : '✋ Sigil') : '';
+  }
+
+  if (bothOpen) {
+    const [a, b] = live;
+    const cx = (a.g.palm.x + b.g.palm.x) / 2, cy = (a.g.palm.y + b.g.palm.y) / 2;
+    const r = Math.max(40, dist(a.g.palm, b.g.palm) / 2 * 0.85), t = T();
+    active.portal = 1;
+    portalRot += 0.05;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.98, 0, TAU); ctx.save(); ctx.clip();
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gr.addColorStop(0, 'rgba(0,0,0,.9)'); gr.addColorStop(1, 'rgba(0,0,0,.45)');
+    ctx.fillStyle = gr; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    for (const st of STARS) {   // flying through a tunnel
+      st.r += st.s * (0.4 + st.r * 2.5); st.a += 0.012 + 0.03 * (1 - st.r);
+      if (st.r > 1) { st.r = 0.02; st.a = Math.random() * TAU; }
+      const r1 = st.r * r, r0 = Math.max(0, r1 - (4 + 34 * st.r * st.r));
+      ctx.strokeStyle = `rgba(${t.hot},${0.15 + 0.85 * st.r})`; ctx.lineWidth = 0.6 + 1.8 * st.r;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(st.a - 0.06) * r0, cy + Math.sin(st.a - 0.06) * r0); ctx.lineTo(cx + Math.cos(st.a) * r1, cy + Math.sin(st.a) * r1); ctx.stroke();
+    }
+    const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.4);
+    cg.addColorStop(0, `rgba(${t.core},.35)`); cg.addColorStop(1, `rgba(${t.core},0)`);
+    ctx.fillStyle = cg; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.restore();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.shadowColor = `rgb(${t.core})`; ctx.shadowBlur = 30;
+    for (let k = 0; k < 3; k++) {
+      ctx.strokeStyle = k ? `rgba(${t.core},.6)` : `rgb(${t.hot})`;
+      ctx.lineWidth = k ? 6 : 2.5;
+      ctx.beginPath();
+      for (let i = 0; i <= 90; i++) {
+        const ang = i / 90 * TAU, rr = r + Math.sin(ang * 7 + portalRot * (3 + k)) * 4 + (Math.random() - .5) * 5;
+        const x = cx + Math.cos(ang) * rr, y = cy + Math.sin(ang) * rr;
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+    for (let i = 0; i < 8; i++) {
+      const ang = Math.random() * TAU, sp = 5 + Math.random() * 7;
+      emit(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r, -Math.sin(ang) * sp + Math.cos(ang), Math.cos(ang) * sp + Math.sin(ang),
+           18 + Math.random() * 22, 2.5 + Math.random() * 3.5, { g: 0.35, drag: 0.97, hot: Math.random() < 0.6 });
+    }
+  }
+  if (bothPoint) {
+    active.bolt = 1;
+    const [a, b] = live;
+    for (let i = 0; i < 3; i++) drawBolt(a.pts[8].x, a.pts[8].y, b.pts[8].x, b.pts[8].y, 2.5 - i * 0.6, 1 - i * 0.25);
+    for (const h of live) for (let i = 0; i < 1; i++) emit(h.pts[8].x, h.pts[8].y, (Math.random() - .5) * 6, (Math.random() - .5) * 6, 15, 4);
+  }
+
+  if (S.mode === 'mesh') Object.assign(active, meshStep(now, live, face));
+
+  updateParticles();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+
+  // flash from a fist blast
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (FX.flash > 0.01) {
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(${T().hot},${FX.flash * 0.3})`; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over'; FX.flash *= 0.84;
+  }
+  // what each hand is doing, right next to it
+  if (S.tags) for (const h of live) if (h.mtag || h.tag) {
+    const wpt = h.pts[0], up = { x: h.pts[9].x - wpt.x, y: h.pts[9].y - wpt.y }, ul = Math.hypot(up.x, up.y) || 1;
+    drawTag(wpt.x - up.x / ul * 34, wpt.y - up.y / ul * 34 - 4, h.mtag || h.tag);
+    h.mtag = null;
+  }
+  // nobody there? say so
+  if (live.length) lastHandT = now;
+  else if (now - lastHandT > 2500) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (now - lastHandT - 2500) / 600) * (0.75 + 0.25 * Math.sin(now / 400));
+    ctx.font = '600 20px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff';
+    ctx.fillText('✋  Raise a hand into view', W / 2, H / 2);
+    ctx.font = '500 13px Inter, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.fillText('About an arm’s length from the camera, palm facing it', W / 2, H / 2 + 28);
+    ctx.restore();
+  }
+  coachTick({ n: live.length, a: active, ev: EV });
+  EV.clear();
+
+  for (const el of guideEls) el.classList.toggle('active', !!active[el.dataset.g]);
+
+  frames++;
+  if (now - fpsT > 1000) {
+    const n = live.length;
+    $('dot').classList.toggle('live', n > 0);
+    let msg = n ? n + (n > 1 ? ' hands' : ' hand') : 'show your hands';
+    if (S.mode === 'mesh' && face) msg += ' · face';
+    $('status').textContent = `${msg} · ${frames} fps`;
+    frames = 0; fpsT = now;
+  }
+}
+
+resize();
+setTheme(0);
+document.fonts?.ready.then(placeSlider);
+</script>
+</body>
+</html>
