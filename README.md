@@ -15,16 +15,16 @@ A hand-tracked visual playground that runs entirely in your browser. Your camera
 | 🙌 Both palms | Portal with a star tunnel |
 | ☝️☝️ Both point | Lightning |
 
-**◈ Mesh**: an elastic net you draw and handle.
+**◈ Mesh**: an elastic net you make with your fingers.
 
 | Gesture | Effect |
 |---|---|
-| 🤏 Pinch empty space and pull | Draw a mesh: pull further for bigger, open your fingers to place it |
-| 🤏 Pinch the mesh | Grab it and carry it |
-| ↕️ Hold it, move your hand closer or farther | Make it bigger or smaller |
-| ✋ Open your fingers | Drop it (let go mid-move to throw it) |
+| 🤏 Pinch, then spread | A mesh forms between your thumb and index |
+| ↔️ Spread or close those fingers | Bigger or smaller (turn your hand to turn it) |
+| 🤏 Close your fingers on it | Grab it and carry it, then open your fingers to drop it (fast = throw) |
+| ✊ Fist while holding it | It bursts and vanishes |
 | 🙂 Drop it on your face | Wear it as a mask fitted to your face (pinch it to take it off) |
-| ↔️ Pinch with both hands | Stretch and rotate |
+| 🙌 Pinch with both hands | Stretch and rotate |
 
 A built-in step-by-step coach teaches each mode the first time you open it. Restart it with the 🎓 button.
 
