@@ -157,8 +157,9 @@
   <div class="gi" data-m="aura" data-g="portal"><div class="em">🙌</div><div><b>Both palms</b><span>Portal</span></div></div>
   <div class="gi" data-m="aura" data-g="bolt"><div class="em">⚡</div><div><b>Both point</b><span>Lightning</span></div></div>
 
-  <div class="gi" data-m="mesh" data-g="grab"><div class="em">🤏</div><div><b>Pinch the mesh</b><span>Grab &amp; carry</span></div></div>
-  <div class="gi" data-m="mesh" data-g="drop"><div class="em">✋</div><div><b>Open your fingers</b><span>Drop · fast = throw</span></div></div>
+  <div class="gi" data-m="mesh" data-g="create"><div class="em">🤏</div><div><b>Pinch empty space &amp; pull</b><span>Draw a mesh · pull further = bigger</span></div></div>
+  <div class="gi" data-m="mesh" data-g="grab"><div class="em">✊</div><div><b>Pinch the mesh</b><span>Grab &amp; carry</span></div></div>
+  <div class="gi" data-m="mesh" data-g="resize"><div class="em">↕️</div><div><b>Hold it, move closer / farther</b><span>Bigger / smaller</span></div></div>
   <div class="gi" data-m="mesh" data-g="face"><div class="em">🙂</div><div><b>Drop it on your face</b><span>Wear it · pinch to remove</span></div></div>
   <div class="gi" data-m="mesh" data-g="stretch"><div class="em">↔️</div><div><b>Pinch with both hands</b><span>Stretch &amp; rotate</span></div></div>
   <div class="gi" data-m="mesh" data-g="shape"><div class="em">⭐</div><div><b>G or ⭐ button</b><span>Change shape</span></div></div>
@@ -241,7 +242,7 @@ function setMode(m) {
   placeSlider(); paintSwatches();
   cloth = null; faceRes = null; faceSm = null;
   CO.prog = 0; coachRender();
-  toast(m === 'mesh' ? '◈ Mesh — pinch it to grab it' : '✦ Aura');
+  toast(m === 'mesh' ? '◈ Mesh — pinch empty space and pull to draw one' : '✦ Aura');
 }
 
 let toastTimer;
@@ -272,12 +273,11 @@ const COACH = {
     { e: '🙌', t: 'Both palms up', s: 'Open both hands side by side to tear open a portal.', ok: c => c.a.portal, hold: 25 },
   ],
   mesh: [
-    { e: '🤏', t: 'Grab the mesh', s: 'Pinch your thumb and index finger together anywhere on the mesh.', ok: c => c.ev.has('grab'), hold: 1 },
-    { e: '↔️', t: 'Carry it', s: 'Keep pinching and move your hand — the mesh comes with you.', ok: c => c.a.grab, hold: 40 },
-    { e: '✋', t: 'Drop it', s: 'Open your fingers to let go. Let go while moving fast to throw it.', ok: c => c.ev.has('drop'), hold: 1 },
-    { e: '🙂', t: 'Wear it', s: 'Grab it, bring it over your face, and open your fingers.', ok: c => c.ev.has('applied'), hold: 1 },
-    { e: '🤏', t: 'Take it off', s: 'Pinch the mask and pull it away.', ok: c => c.ev.has('peel'), hold: 1 },
-    { e: '🤏', t: 'Stretch it', s: 'Pinch it with both hands and pull them apart.', ok: c => c.a.stretch, hold: 25 },
+    { e: '🤏', t: 'Draw a mesh', s: 'Pinch thumb and index in empty space, then pull your hand away. Open your fingers when it’s the size you want.', ok: c => c.ev.has('created'), hold: 1 },
+    { e: '✊', t: 'Grab it', s: 'Pinch anywhere on the mesh, then move your hand to carry it.', ok: c => c.a.grab, hold: 30 },
+    { e: '↕️', t: 'Resize it', s: 'While holding it, move your hand closer to the camera to grow it, farther away to shrink it.', ok: c => c.a.resize, hold: 25 },
+    { e: '✋', t: 'Drop it', s: 'Open your fingers to let go. Let go mid-move to throw it.', ok: c => c.ev.has('drop'), hold: 1 },
+    { e: '🙂', t: 'Wear it', s: 'Grab it, bring it over your face and open your fingers. Pinch the mask to take it off.', ok: c => c.ev.has('applied'), hold: 1 },
   ],
 };
 const CO = { step: {}, prog: 0 };
@@ -923,8 +923,6 @@ function meshStep(now, live, face) {
   if (face) lastFace = { ...face, t: now };
   const recentFace = lastFace && now - lastFace.t < 1500 ? lastFace : null;
   const byKey = k => live.find(h => h.key === k);
-  if (!cloth) { if (now < spawnCooldown) return act; spawnFloating(W, H); }
-
   for (const h of live) {
     const p = h.pts, raw = { x: (p[4].x + p[8].x) / 2, y: (p[4].y + p[8].y) / 2 };
     h.pinchPt = h.pinchPt ? { x: lerp(h.pinchPt.x, raw.x, 0.6), y: lerp(h.pinchPt.y, raw.y, 0.6) } : raw;
@@ -937,9 +935,48 @@ function meshStep(now, live, face) {
   }
   const reach = () => Math.max(60, cellSize() * 3);
 
-  // grab: pinch anywhere on (or near) the mesh — or on the mask
+  // ① pinch empty space and pull to draw a mesh (replaces the old one); pinch a mesh to grab it
   for (const h of live) {
-    if (!h.pinchStart || cloth.state === 'binding' || cloth.grabs.some(g => g.key === h.key)) continue;
+    if (!h.pinchStart || now < spawnCooldown) continue;
+    if (cloth && (cloth.state !== 'floating' || cloth.grabs.length)) continue;
+    if (cloth && (dist(h.pinchPt, cloth.shape.c) < shapeRadius(cloth.shape) + 50 || nearestPt(h.pinchPt, false)[1] < reach())) continue;
+    newCloth(h.pinchPt);
+    cloth.state = 'creating'; cloth.creator = h.key; cloth.origin = { ...h.pinchPt }; cloth.lostC = 0;
+    cloth.grabs = []; cloth.v = { x: 0, y: 0 }; cloth.av = 0;
+    cloth.shape = { c: { ...h.pinchPt }, a: 0, k: 1, preset: S.meshShape, baseR: 20, loc: null };
+    h.pinchStart = false;
+    break;
+  }
+  if (!cloth) {
+    for (const h of live) if (!h.holding) h.mtag = '🤏 Pinch & pull to draw a mesh';
+    drawCursors(live);
+    return act;
+  }
+
+  // ② drawing: the further you pull, the bigger it gets; open your fingers to place it
+  if (cloth.state === 'creating') {
+    act.create = 1;
+    const h = byKey(cloth.creator);
+    if (h && h.holding) {
+      cloth.lostC = 0;
+      const r = clamp(dist(h.pinchPt, cloth.origin), 20, Math.min(W, H) * 0.6);
+      cloth.shape.baseR = lerp(cloth.shape.baseR, r, 0.5);
+      h.mtag = '↔️ Pull to size it  ·  open fingers to place';
+      ctx.save(); ctx.globalCompositeOperation = 'source-over';
+      ctx.setLineDash([4, 6]); ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(cloth.origin.x, cloth.origin.y); ctx.lineTo(h.pinchPt.x, h.pinchPt.y); ctx.stroke();
+      ctx.restore();
+    } else if (h || ++cloth.lostC > 8) {
+      if (cloth.shape.baseR < 40) { cloth = null; drawCursors(live); return act; } // just a tap: nothing drawn
+      cloth.state = 'floating';
+      EV.add('created');
+      toast('Mesh placed — pinch it to grab it');
+    }
+  }
+
+  // ③ grab: pinch anywhere on (or near) the mesh — or on the mask
+  for (const h of live) {
+    if (!h.pinchStart || cloth.state === 'binding' || cloth.state === 'creating' || cloth.grabs.some(g => g.key === h.key)) continue;
     if (cloth.state === 'applied') {
       if (!face || dist(h.pinchPt, face.center) > face.width * 0.6) continue;
       peelOff();
@@ -947,6 +984,7 @@ function meshStep(now, live, face) {
     const [i] = nearestPt(h.pinchPt, false);
     cloth.grabs.push({ key: h.key, i, t: { ...h.pinchPt }, lost: 0 });
     cloth.state = 'floating';
+    h.sizeSm = h.g.size;
     EV.add('grab');
     RINGS.push({ x: h.pinchPt.x, y: h.pinchPt.y, r: 6, v: 5, life: 18, max: 18, crisp: true, col: 'rgba(255,255,255,.9)' });
   }
@@ -955,7 +993,7 @@ function meshStep(now, live, face) {
   const had = cloth.grabs.length;
   cloth.grabs = cloth.grabs.filter(g => {
     const h = byKey(g.key);
-    if (h && h.holding) { g.lost = 0; g.t = { ...h.pinchPt }; h.mtag = '🤏 Holding  ·  open your fingers to drop'; return true; }
+    if (h && h.holding) { g.lost = 0; g.t = { ...h.pinchPt }; h.mtag = cloth.grabs.length > 1 ? '↔️ Stretching' : '🤏 Holding  ·  closer = bigger, farther = smaller'; return true; }
     if (!h && ++g.lost <= 8) return true; // tracking blinked for a moment: keep holding
     return false;
   });
@@ -984,10 +1022,24 @@ function meshStep(now, live, face) {
     if (gs.length < 2) cloth.st = null;
     if (gs.length === 1) {
       act.grab = 1;
-      const g = gs[0], r = cloth.rest[g.i];
+      const g = gs[0], h = byKey(g.key);
+      if (h) {
+        // your hand looks bigger on camera as it comes closer — the mesh follows that
+        if (g.size0 === undefined) { g.size0 = h.g.size; g.k0 = sh.k; h.sizeSm = h.g.size; }
+        h.sizeSm = lerp(h.sizeSm ?? h.g.size, h.g.size, 0.2);
+        let ratio = h.sizeSm / g.size0;
+        const dz = 0.06;                                   // ignore tiny jitter
+        if (Math.abs(ratio - 1) < dz) ratio = 1; else { ratio = ratio > 1 ? ratio - dz : ratio + dz; act.resize = 1; }
+        sh.k = lerp(sh.k, g.k0 * Math.pow(ratio, 1.8), 0.25);
+        const r0 = shapeRadius(sh), maxR = Math.min(W, H) * 0.7;
+        if (r0 > maxR) sh.k *= maxR / r0;
+        if (r0 < 25) sh.k *= 25 / r0;
+      }
+      const r = cloth.rest[g.i];
       sh.c.x += (g.t.x - r.x) * 0.5; sh.c.y += (g.t.y - r.y) * 0.5;
     } else if (gs.length >= 2) {
       act.grab = 1; act.stretch = 1;
+      for (const g of gs) { g.size0 = undefined; g.k0 = undefined; }   // re-measure when back to one hand
       const [g1, g2] = gs;
       const mid = { x: (g1.t.x + g2.t.x) / 2, y: (g1.t.y + g2.t.y) / 2 };
       const d = Math.max(1, dist(g1.t, g2.t)), ang = Math.atan2(g2.t.y - g1.t.y, g2.t.x - g1.t.x);
