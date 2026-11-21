@@ -551,24 +551,14 @@ function filterPts(store, raw, t, minCutoff, beta) {
 // gestures are judged on the model's 3D hand (metres), so they work at any distance or angle
 function analyse(pts, wl, h) {
   const size = dist(pts[0], pts[9]);
-  const k2 = 0.09 / Math.max(1, size);
-  const d3 = wl
-    ? (a, b) => Math.hypot(wl[a].x - wl[b].x, wl[a].y - wl[b].y, wl[a].z - wl[b].z)
-    : (a, b) => dist(pts[a], pts[b]) * k2;
-  const F = [[8, 6], [12, 10], [16, 14], [20, 18]];
-  const ext = F.map(([tip, pip]) => d3(tip, 0) > d3(pip, 0) * 1.12);
-  const curl = F.map(([tip, pip]) => d3(tip, 0) < d3(pip, 0) * 1.02);
+  // v1 rules: judged on screen, relative to hand size
+  const ext = [[8, 6], [12, 10], [16, 14], [20, 18]].map(([tip, pip]) => dist(pts[tip], pts[0]) > dist(pts[pip], pts[0]) * 1.12);
   const nExt = ext.filter(Boolean).length;
-  // pinch = thumb and index tips touching, judged in 3D *and* on screen (forgiving, with hysteresis).
-  // It is decided before "fist": a normal pinch curls the other three fingers, which must not block it.
-  const pd3 = d3(4, 8), pd2 = dist(pts[4], pts[8]) / Math.max(1, size);
-  const indexOut = d3(8, 0) > d3(5, 0) * 1.15;                 // index reaches past its knuckle
-  const allCurled = curl.filter(Boolean).length >= 4;
-  // a pinch lets go the moment the hand closes into a fist (the thumb stays on the index, so distance alone would stick)
-  h.pinchState = !allCurled && (h.pinchState ? (pd3 < 0.065 || pd2 < 0.45) : (indexOut && (pd3 < 0.042 || pd2 < 0.3)));
+  const pd = dist(pts[4], pts[8]) / Math.max(1, size);
+  // fist: no finger extended and the index tip tucked in near its knuckle (so a thumb resting on it isn't a pinch)
+  const fist = nExt === 0 && dist(pts[8], pts[0]) < dist(pts[5], pts[0]) * 1.15;
+  h.pinchState = !fist && (h.pinchState ? pd < 0.4 : pd < 0.32);
   const pinch = h.pinchState;
-  // fist = every finger curled, index included, and not pinching
-  const fist = !pinch && (allCurled || (curl[1] && curl[2] && curl[3] && !indexOut));
   const palm = [0, 5, 9, 13, 17].reduce((a, i) => ({ x: a.x + pts[i].x / 5, y: a.y + pts[i].y / 5 }), { x: 0, y: 0 });
   let tilt = { phi: 0, sq: 1 };
   if (wl) { // palm normal → how the sigil tilts in 3D
@@ -1197,7 +1187,7 @@ const beginBtn = $('begin');
     const hopts = (delegate) => ({
       baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate },
       runningMode: 'VIDEO', numHands: 2,
-      minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.55, minTrackingConfidence: 0.55,
+      minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5,
     });
     try { landmarker = await HandLandmarker.createFromOptions(fs, hopts('GPU')); }
     catch { landmarker = await HandLandmarker.createFromOptions(fs, hopts('CPU')); }
@@ -1298,7 +1288,7 @@ function loop(now) {
       const h = handState(key);
       h.seen = true;
       const raw = lm.map(map);
-      h.pts = filterPts(h, raw, now, 1.1, 0.03);
+      h.pts = h.pts ? h.pts.map((p, j) => ({ x: lerp(p.x, raw[j].x, 0.6), y: lerp(p.y, raw[j].y, 0.6) })) : raw;   // v1 smoothing
       h.g = analyse(h.pts, results.worldLandmarks?.[i], h);
       live.push(h);
       if (h.angle !== null) {
@@ -1315,7 +1305,7 @@ function loop(now) {
   let face = null;
   if (S.mode === 'mesh' && faceRes?.faceLandmarks?.length) {
     const raw = faceRes.faceLandmarks[0].map(map);
-    faceSm = filterPts(faceF, raw, now, 1.0, 0.015);
+    faceSm = faceSm && faceSm.length === raw.length ? faceSm.map((p, j) => ({ x: lerp(p.x, raw[j].x, 0.75), y: lerp(p.y, raw[j].y, 0.75) })) : raw;
     face = { pts: faceSm, center: { x: (faceSm[10].x + faceSm[152].x) / 2, y: (faceSm[10].y + faceSm[152].y) / 2 }, width: dist(faceSm[234], faceSm[454]) };
   } else if (S.mode === 'mesh' && faceRes) { faceSm = null; faceF.f = null; }
 
