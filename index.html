@@ -563,10 +563,12 @@ function analyse(pts, wl, h) {
   // It is decided before "fist": a normal pinch curls the other three fingers, which must not block it.
   const pd3 = d3(4, 8), pd2 = dist(pts[4], pts[8]) / Math.max(1, size);
   const indexOut = d3(8, 0) > d3(5, 0) * 1.15;                 // index reaches past its knuckle
-  h.pinchState = h.pinchState ? (pd3 < 0.065 || pd2 < 0.45) : (indexOut && (pd3 < 0.042 || pd2 < 0.3));
+  const allCurled = curl.filter(Boolean).length >= 4;
+  // a pinch lets go the moment the hand closes into a fist (the thumb stays on the index, so distance alone would stick)
+  h.pinchState = !allCurled && (h.pinchState ? (pd3 < 0.065 || pd2 < 0.45) : (indexOut && (pd3 < 0.042 || pd2 < 0.3)));
   const pinch = h.pinchState;
   // fist = every finger curled, index included, and not pinching
-  const fist = !pinch && (curl.filter(Boolean).length >= 4 || (curl[1] && curl[2] && curl[3] && !indexOut));
+  const fist = !pinch && (allCurled || (curl[1] && curl[2] && curl[3] && !indexOut));
   const palm = [0, 5, 9, 13, 17].reduce((a, i) => ({ x: a.x + pts[i].x / 5, y: a.y + pts[i].y / 5 }), { x: 0, y: 0 });
   let tilt = { phi: 0, sq: 1 };
   if (wl) { // palm normal → how the sigil tilts in 3D
@@ -1352,13 +1354,15 @@ function loop(now) {
       ctx.restore();
     } else {
       if (h.wasFist && h.charge > 0.15) {
-        FX.flash = 0.12 + 0.25 * h.charge; FX.shake = 2 + 6 * h.charge; EV.add('burst');
-        const n = Math.floor(110 * h.charge);
+        FX.flash = 0.2 + 0.4 * h.charge; FX.shake = 3 + 11 * h.charge; EV.add('burst');
+        const n = Math.floor(220 * h.charge);
         for (let i = 0; i < n; i++) {
           const a = Math.random() * TAU, sp = 4 + Math.random() * 16 * h.charge;
           emit(g.palm.x, g.palm.y, Math.cos(a) * sp, Math.sin(a) * sp, 40 + Math.random() * 40, 4 + Math.random() * 7, { drag: 0.95, g: 0.05 });
         }
-        RINGS.push({ x: g.palm.x, y: g.palm.y, r: g.size * 0.5, v: 22 * h.charge + 6, life: 40, max: 40, theme: S.theme });
+        RINGS.push({ x: g.palm.x, y: g.palm.y, r: g.size * 0.5, v: 26 * h.charge + 8, life: 45, max: 45, theme: S.theme });
+        RINGS.push({ x: g.palm.x, y: g.palm.y, r: g.size * 0.3, v: 15 * h.charge + 5, life: 55, max: 55, theme: S.theme });
+        if (h.charge > 0.9) for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + Math.random() * 0.4, L = g.size * (3 + Math.random() * 2); drawBolt(g.palm.x, g.palm.y, g.palm.x + Math.cos(a) * L, g.palm.y + Math.sin(a) * L, 2, 0.9); }
       }
       h.charge = Math.max(0, h.charge - 0.05);
     }
